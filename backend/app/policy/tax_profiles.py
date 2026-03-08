@@ -5,6 +5,7 @@ from typing import Dict, Optional, Tuple, Any
 
 import pycountry
 
+#Trying to beat companies like SphereAI Global engine buyt they are not focusing on personal finance
 
 # =========================================================
 # POLICY VERSIONING (audit + reproducibility)
@@ -99,7 +100,7 @@ def _normalize_employment(employment_type: Optional[str]) -> str:
 # IMPORTANT:
 # - This is not "tax law". This is a conservative modeling layer.
 # - Correctness here means: transparent, versioned, and never silent.
-# - Add/override countries as you mature; the framework supports it.
+# - Add/override countries as we mature; the framework supports it.
 # =========================================================
 
 COUNTRY_MODELS: Dict[str, TaxModel] = {
@@ -172,7 +173,7 @@ def estimate_effective_tax_rate(
 
 
 # =========================================================
-# AUDIT-GRADE TAX ESTIMATION (RECOMMENDED)
+# AUDIT-GRADE TAX ESTIMATION
 # =========================================================
 
 def estimate_tax(
