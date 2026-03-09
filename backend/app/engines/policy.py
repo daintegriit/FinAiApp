@@ -15,8 +15,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Dict
 
-from .policy_registry import get_policy_versions, get_registry_metadata
-
+from app.policy.tax_models.policy_registry import (
+    get_policy_versions,
+    get_registry_metadata,
+)
 
 ENGINE_VERSION = "policy_engine_v1"
 
