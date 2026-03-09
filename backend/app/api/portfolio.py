@@ -1,18 +1,15 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
-from app.engines.portfolio_growth import simulate_portfolio_growth
+from app.schemas.portfolio import PortfolioRequest
+from app.engines.portfolio_growth import (
+    PortfolioAssumptions,
+    evaluate_portfolio_growth,
+)
 
 router = APIRouter(
     prefix="/portfolio",
-    tags=["Portfolio"]
+    tags=["portfolio"]
 )
-
-
-class PortfolioRequest(BaseModel):
-    monthly_contribution: float
-    years: int
-    annual_return: float = 0.07
 
 
 @router.post("/growth")
@@ -20,16 +17,21 @@ def portfolio_growth(req: PortfolioRequest):
 
     try:
 
-        result = simulate_portfolio_growth(
+        assumptions = PortfolioAssumptions(
             monthly_contribution=req.monthly_contribution,
             years=req.years,
-            annual_return=req.annual_return
+            annual_return=req.annual_return,
+            volatility=req.volatility,
+            simulations=req.simulations,
         )
 
-        return {
-            "status": "success",
-            "result": result
-        }
+        result = evaluate_portfolio_growth(assumptions)
+
+        return result
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Portfolio simulation failed: {str(e)}"
+        )
