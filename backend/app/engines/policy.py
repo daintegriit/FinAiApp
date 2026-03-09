@@ -20,6 +20,9 @@ from app.policy.tax_models.policy_registry import (
     get_registry_metadata,
 )
 
+from app.engines.engine_registry import register_engine
+
+
 ENGINE_VERSION = "policy_engine_v1"
 
 
@@ -27,6 +30,7 @@ ENGINE_VERSION = "policy_engine_v1"
 # Core Policy Validation
 # --------------------------------------------------
 
+@register_engine("policy")
 def validate_policy(
     income: float,
     expenses: float,
