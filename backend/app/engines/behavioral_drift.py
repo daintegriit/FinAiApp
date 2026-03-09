@@ -3,13 +3,13 @@ from __future__ import annotations
 import time
 import uuid
 from datetime import datetime
-from typing import List, Literal, Optional
+from typing import List, Literal, Any
 
 from pydantic import BaseModel, Field
 
 from app.schemas.commitment_lock import CommitmentLockRequest
 from app.engines.commitment_lock import evaluate_commitment_lock
-from app.policy.policy_registry import get_policy_versions
+from app.policy.tax_models.policy_registry import get_policy_versions
 
 
 ENGINE_VERSION = "behavioral_drift_v1"
@@ -22,13 +22,9 @@ ENGINE_VERSION = "behavioral_drift_v1"
 class BehaviorSignal(BaseModel):
 
     signal: str
-
     previous_value: float
-
     current_value: float
-
     change: float
-
     interpretation: str
 
     model_config = {"frozen": True}
@@ -44,7 +40,6 @@ class DriftBand(BaseModel):
     ]
 
     min_score: int
-
     max_score: int
 
     model_config = {"frozen": True}
@@ -53,13 +48,10 @@ class DriftBand(BaseModel):
 class BehavioralDriftResponse(BaseModel):
 
     schema_version: str = "1.0"
-
     engine_version: str
 
     request_id: str
-
     calculation_timestamp: datetime
-
     processing_ms: int
 
     drift_score: int = Field(..., ge=0, le=100)
@@ -73,7 +65,6 @@ class BehavioralDriftResponse(BaseModel):
     supporting_engines: dict[str, object]
 
     summary: str
-
     recommendations: List[str]
 
     model_config = {"frozen": True}
@@ -87,18 +78,42 @@ def _clamp(x: float, lo: int = 0, hi: int = 100):
     return max(lo, min(hi, int(round(x))))
 
 
-def _band(score: int):
+def _safe_get(obj: Any, field: str, default=None):
+    if obj is None:
+        return default
+    if isinstance(obj, dict):
+        return obj.get(field, default)
+    return getattr(obj, field, default)
+
+
+def _band(score: int) -> DriftBand:
 
     if score < 25:
-        return DriftBand("improving", 0, 24)
+        return DriftBand(
+            label="improving",
+            min_score=0,
+            max_score=24,
+        )
 
     if score < 45:
-        return DriftBand("stable", 25, 44)
+        return DriftBand(
+            label="stable",
+            min_score=25,
+            max_score=44,
+        )
 
     if score < 70:
-        return DriftBand("early_drift", 45, 69)
+        return DriftBand(
+            label="early_drift",
+            min_score=45,
+            max_score=69,
+        )
 
-    return DriftBand("concerning_drift", 70, 100)
+    return DriftBand(
+        label="concerning_drift",
+        min_score=70,
+        max_score=100,
+    )
 
 
 # --------------------------------------------------
@@ -196,13 +211,13 @@ def evaluate_behavioral_drift(
 
     timestamp = datetime.utcnow()
 
-    policy_versions = get_policy_versions()
+    raw_policy_versions = get_policy_versions()
+    policy_versions = dict(raw_policy_versions) if raw_policy_versions else {}
 
     commitment = evaluate_commitment_lock(req)
 
-    income_share = getattr(commitment, "income_share", 0.0) or 0.0
-
-    free_cashflow_share = getattr(commitment, "free_cashflow_share", 0.0) or 0.0
+    income_share = _safe_get(commitment, "income_share", 0.0) or 0.0
+    free_cashflow_share = _safe_get(commitment, "free_cashflow_share", 0.0) or 0.0
 
 
     # --------------------------------------------------

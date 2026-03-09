@@ -3,13 +3,13 @@ from __future__ import annotations
 import time
 import uuid
 from datetime import datetime
-from typing import Optional, Literal, List
+from typing import Optional, Literal, List, Any
 
 from pydantic import BaseModel, Field
 
 from app.schemas.commitment_lock import CommitmentLockRequest
 from app.engines.commitment_lock import evaluate_commitment_lock
-from app.policy.policy_registry import get_policy_versions
+from app.policy.tax_models.policy_registry import get_policy_versions
 
 
 ENGINE_VERSION = "financial_optionality_v1"
@@ -69,12 +69,18 @@ def _clamp_int(x: float, lo: int = 0, hi: int = 100) -> int:
     return max(lo, min(hi, int(round(x))))
 
 
-def _safe_get(obj: object, field: str, default=None):
+def _safe_get(obj: Any, field: str, default: Any = None) -> Any:
     if obj is None:
         return default
     if isinstance(obj, dict):
         return obj.get(field, default)
     return getattr(obj, field, default)
+
+
+def _normalize_confidence(value: Optional[str], default: Literal["low", "medium", "high"] = "medium") -> Literal["low", "medium", "high"]:
+    if value in ("low", "medium", "high"):
+        return value
+    return default
 
 
 def _band_for_score(score: int) -> OptionalityBand:
@@ -88,13 +94,11 @@ def _band_for_score(score: int) -> OptionalityBand:
 
 
 def _derive_confidence(commitment_result: object) -> Literal["low", "medium", "high"]:
-    tax_conf = _safe_get(commitment_result, "tax_confidence", None)
-    lock_conf = _safe_get(commitment_result, "lock_score_confidence", None)
+    tax_conf = _normalize_confidence(_safe_get(commitment_result, "tax_confidence", None), default="medium")
+    lock_conf = _normalize_confidence(_safe_get(commitment_result, "lock_score_confidence", None), default="medium")
 
-    vals = [v for v in [tax_conf, lock_conf] if v is not None]
+    vals = [tax_conf, lock_conf]
 
-    if not vals:
-        return "low"
     if "low" in vals:
         return "low"
     if "medium" in vals:
@@ -111,16 +115,19 @@ def _score_commitment_flexibility(commitment_result: object) -> OptionalityFacto
     High commitment lock reduces life flexibility.
     """
     lock_score = _safe_get(commitment_result, "lock_score", 50)
-    confidence = _safe_get(commitment_result, "lock_score_confidence", "medium")
+    confidence = _normalize_confidence(
+        _safe_get(commitment_result, "lock_score_confidence", None),
+        default="medium",
+    )
 
-    score = _clamp_int(100 - lock_score)
+    score = _clamp_int(100 - float(lock_score))
     weight = 0.45
 
     return OptionalityFactor(
         name="commitment_flexibility",
         score=score,
         weight=weight,
-        weighted_score=score * weight,
+        weighted_score=round(score * weight, 2),
         confidence=confidence,
         notes="Derived inversely from commitment lock score.",
     )
@@ -131,7 +138,10 @@ def _score_income_flexibility(commitment_result: object) -> OptionalityFactor:
     Lower income burden means more room to change jobs, relocate, or absorb uncertainty.
     """
     income_share = _safe_get(commitment_result, "income_share", None)
-    confidence = _safe_get(commitment_result, "tax_confidence", "medium")
+    confidence = _normalize_confidence(
+        _safe_get(commitment_result, "tax_confidence", None),
+        default="medium",
+    )
 
     if income_share is None:
         score = 50
@@ -147,7 +157,7 @@ def _score_income_flexibility(commitment_result: object) -> OptionalityFactor:
         name="income_flexibility",
         score=score,
         weight=weight,
-        weighted_score=score * weight,
+        weighted_score=round(score * weight, 2),
         confidence=confidence,
         notes=note,
     )
@@ -158,7 +168,10 @@ def _score_liquidity_flexibility(commitment_result: object) -> OptionalityFactor
     If a commitment consumes most free cashflow, optionality collapses.
     """
     free_cashflow_share = _safe_get(commitment_result, "free_cashflow_share", None)
-    confidence = _safe_get(commitment_result, "lock_score_confidence", "medium")
+    confidence = _normalize_confidence(
+        _safe_get(commitment_result, "lock_score_confidence", None),
+        default="medium",
+    )
 
     if free_cashflow_share is None:
         score = 50
@@ -174,7 +187,7 @@ def _score_liquidity_flexibility(commitment_result: object) -> OptionalityFactor
         name="liquidity_flexibility",
         score=score,
         weight=weight,
-        weighted_score=score * weight,
+        weighted_score=round(score * weight, 2),
         confidence=confidence,
         notes=note,
     )
@@ -252,7 +265,8 @@ def evaluate_optionality(req: CommitmentLockRequest) -> FinancialOptionalityResp
     request_id = str(uuid.uuid4())
     timestamp = datetime.utcnow()
 
-    policy_versions = get_policy_versions()
+    raw_policy_versions = get_policy_versions()
+    policy_versions = dict(raw_policy_versions) if raw_policy_versions is not None else {}
 
     commitment_result = evaluate_commitment_lock(req)
 

@@ -3,16 +3,17 @@ from __future__ import annotations
 import time
 import uuid
 from datetime import datetime
-from typing import List, Optional, Literal
+from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
 from app.schemas.commitment_lock import CommitmentLockRequest
 from app.engines.commitment_lock import evaluate_commitment_lock
-from app.policy.policy_registry import get_policy_versions
+from app.engines.peer_distribution import evaluate_peer_distribution
+from app.policy.tax_models.policy_registry import get_policy_versions
 
 
-ENGINE_VERSION = "peer_benchmark_v1"
+ENGINE_VERSION = "peer_benchmark_v2"
 
 
 # --------------------------------------------------
@@ -94,46 +95,6 @@ def _band(score: int) -> PeerBand:
         return PeerBand(label="below_average", min_score=30, max_score=49)
 
     return PeerBand(label="weak", min_score=0, max_score=29)
-
-
-# --------------------------------------------------
-# Peer Baselines (placeholder global medians)
-# --------------------------------------------------
-
-PEER_BASELINES = {
-
-    "income_commitment_ratio": 0.15,
-
-    "free_cashflow_commitment_ratio": 0.30,
-
-    "term_length_months": 48,
-
-}
-
-
-# --------------------------------------------------
-# Percentile Estimation
-# --------------------------------------------------
-
-def _estimate_percentile(user_value: float, peer_value: float) -> int:
-
-    if peer_value == 0:
-        return 50
-
-    ratio = user_value / peer_value
-
-    if ratio <= 0.5:
-        return 10
-    if ratio <= 0.75:
-        return 30
-    if ratio <= 1.0:
-        return 50
-    if ratio <= 1.25:
-        return 70
-    if ratio <= 1.5:
-        return 85
-
-    return 95
 
 
 # --------------------------------------------------
@@ -237,15 +198,43 @@ def evaluate_peer_benchmark(
 
     term = req.term_months
 
+    income = getattr(req.context, "gross_annual_income", None)
 
     metrics: List[PeerMetric] = []
 
 
+    # --------------------------------------------------
+    # Run Peer Distribution Engine
+    # --------------------------------------------------
+
+    distribution = evaluate_peer_distribution(
+
+        income=income or 75000,
+
+        housing_ratio=income_share or 0.0,
+
+        car_payment_ratio=income_share or 0.0,
+
+        commitment_ratio=income_share or 0.0,
+
+        savings_rate=(1 - free_cashflow_share) if free_cashflow_share else 0.1
+    )
+
+
+    percentiles = distribution["percentiles"]
+
+    medians = distribution["peer_medians"]
+
+
+    # --------------------------------------------------
+    # Income Commitment Ratio
+    # --------------------------------------------------
+
     if income_share is not None:
 
-        peer = PEER_BASELINES["income_commitment_ratio"]
+        p = int(percentiles["commitment_ratio"])
 
-        percentile = _estimate_percentile(income_share, peer)
+        peer = medians["commitment_ratio"]
 
         metrics.append(
 
@@ -253,17 +242,21 @@ def evaluate_peer_benchmark(
                 metric="income_commitment_ratio",
                 user_value=income_share,
                 peer_median=peer,
-                percentile=percentile,
+                percentile=p,
                 interpretation=_interpret("income_commitment_ratio", income_share, peer),
             )
         )
 
 
+    # --------------------------------------------------
+    # Free Cashflow Commitment Ratio
+    # --------------------------------------------------
+
     if free_cashflow_share is not None:
 
-        peer = PEER_BASELINES["free_cashflow_commitment_ratio"]
+        peer = medians["savings_rate"]
 
-        percentile = _estimate_percentile(free_cashflow_share, peer)
+        p = int(percentiles["savings_rate"])
 
         metrics.append(
 
@@ -271,7 +264,7 @@ def evaluate_peer_benchmark(
                 metric="free_cashflow_commitment_ratio",
                 user_value=free_cashflow_share,
                 peer_median=peer,
-                percentile=percentile,
+                percentile=p,
                 interpretation=_interpret(
                     "free_cashflow_commitment_ratio",
                     free_cashflow_share,
@@ -281,9 +274,22 @@ def evaluate_peer_benchmark(
         )
 
 
-    peer_term = PEER_BASELINES["term_length_months"]
+    # --------------------------------------------------
+    # Term Length Benchmark
+    # --------------------------------------------------
 
-    percentile = _estimate_percentile(term, peer_term)
+    peer_term = 48
+
+    ratio = term / peer_term
+
+    if ratio <= 0.75:
+        percentile = 30
+    elif ratio <= 1.0:
+        percentile = 50
+    elif ratio <= 1.25:
+        percentile = 70
+    else:
+        percentile = 85
 
     metrics.append(
 
@@ -296,6 +302,10 @@ def evaluate_peer_benchmark(
         )
     )
 
+
+    # --------------------------------------------------
+    # Score
+    # --------------------------------------------------
 
     if metrics:
 
@@ -338,7 +348,8 @@ def evaluate_peer_benchmark(
         policy_versions=policy_versions,
 
         supporting_engines={
-            "commitment_lock": commitment
+            "commitment_lock": commitment,
+            "peer_distribution": distribution
         },
 
         summary=summary,

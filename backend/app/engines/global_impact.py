@@ -3,17 +3,21 @@ from __future__ import annotations
 import time
 import uuid
 from datetime import datetime
-from typing import List, Literal
+from typing import List, Literal, Any
 
 from pydantic import BaseModel, Field
 
 from app.schemas.commitment_lock import CommitmentLockRequest
 from app.engines.commitment_lock import evaluate_commitment_lock
-from app.policy.policy_registry import get_policy_versions
+from app.engines.portfolio_growth import (
+    evaluate_portfolio_growth,
+    PortfolioAssumptions,
+)
+from app.policy.tax_models.policy_registry import get_policy_versions
 from app.core.config import settings
 
 
-ENGINE_VERSION = "global_impact_v1"
+ENGINE_VERSION = "global_impact_v2"
 
 
 # --------------------------------------------------
@@ -23,11 +27,9 @@ ENGINE_VERSION = "global_impact_v1"
 class WealthProjection(BaseModel):
 
     years: int
-
-    baseline_wealth: float
-
-    commitment_wealth: float
-
+    median_wealth: float
+    worst_case: float
+    best_case: float
     opportunity_cost: float
 
     model_config = {"frozen": True}
@@ -43,7 +45,6 @@ class ImpactBand(BaseModel):
     ]
 
     min_score: int
-
     max_score: int
 
     model_config = {"frozen": True}
@@ -52,13 +53,10 @@ class ImpactBand(BaseModel):
 class GlobalImpactResponse(BaseModel):
 
     schema_version: str = "1.0"
-
     engine_version: str
 
     request_id: str
-
     calculation_timestamp: datetime
-
     processing_ms: int
 
     impact_score: int = Field(..., ge=0, le=100)
@@ -74,7 +72,6 @@ class GlobalImpactResponse(BaseModel):
     supporting_engines: dict[str, object]
 
     summary: str
-
     recommendations: List[str]
 
     model_config = {"frozen": True}
@@ -91,28 +88,15 @@ def _clamp(x: float, lo: int = 0, hi: int = 100) -> int:
 def _band(score: int) -> ImpactBand:
 
     if score < 25:
-        return ImpactBand("minimal_impact", 0, 24)
+        return ImpactBand(label="minimal_impact", min_score=0, max_score=24)
 
     if score < 50:
-        return ImpactBand("moderate_impact", 25, 49)
+        return ImpactBand(label="moderate_impact", min_score=25, max_score=49)
 
     if score < 75:
-        return ImpactBand("significant_impact", 50, 74)
+        return ImpactBand(label="significant_impact", min_score=50, max_score=74)
 
-    return ImpactBand("severe_impact", 75, 100)
-
-
-# --------------------------------------------------
-# Financial math
-# --------------------------------------------------
-
-def future_value(monthly: float, years: int, annual_return: float):
-
-    r = annual_return / 12
-
-    n = years * 12
-
-    return monthly * ((1 + r) ** n - 1) / r
+    return ImpactBand(label="severe_impact", min_score=75, max_score=100)
 
 
 # --------------------------------------------------
@@ -122,21 +106,18 @@ def future_value(monthly: float, years: int, annual_return: float):
 def _summary(score: int, band: str) -> str:
 
     if band == "minimal_impact":
-
         return (
             "The financial commitment has limited long-term impact on wealth "
-            "trajectory when evaluated against typical investment growth assumptions."
+            "trajectory when evaluated against simulated market outcomes."
         )
 
     if band == "moderate_impact":
-
         return (
             "The commitment introduces a moderate long-term drag on wealth "
-            "accumulation due to capital allocation toward recurring payments."
+            "accumulation based on simulated investment paths."
         )
 
     if band == "significant_impact":
-
         return (
             "The financial commitment materially affects long-term wealth "
             "growth and reduces capital available for investment."
@@ -191,43 +172,49 @@ def evaluate_global_impact(
 
     timestamp = datetime.utcnow()
 
-    policy_versions = get_policy_versions()
+    raw_policy_versions = get_policy_versions()
+    policy_versions = dict(raw_policy_versions) if raw_policy_versions else {}
 
     commitment = evaluate_commitment_lock(req)
 
-    monthly_payment = req.monthly_payment
+    monthly_payment = float(req.monthly_payment)
 
-    annual_return = (
-        req.annual_return_assumption
-        if req.annual_return_assumption
-        else settings.DEFAULT_ANNUAL_RETURN
-    )
+    annual_return = getattr(
+        req,
+        "annual_return_assumption",
+        None,
+    ) or settings.DEFAULT_ANNUAL_RETURN
 
 
     projection_years = [5, 10, 20, 30]
 
     projections: List[WealthProjection] = []
 
-    total_cost = 0
-
 
     for years in projection_years:
 
-        baseline = future_value(monthly_payment, years, annual_return)
+        assumptions = PortfolioAssumptions(
+            monthly_contribution=monthly_payment,
+            years=years,
+            expected_return=annual_return,
+            volatility=0.15,
+            simulations=500,
+        )
 
-        commitment_wealth = 0
+        portfolio = evaluate_portfolio_growth(assumptions)
 
-        opportunity = baseline - commitment_wealth
+        outcome = portfolio.outcome
 
-        total_cost += opportunity
+        opportunity_cost = outcome.median_wealth
 
         projections.append(
 
             WealthProjection(
                 years=years,
-                baseline_wealth=round(baseline, 2),
-                commitment_wealth=0,
-                opportunity_cost=round(opportunity, 2),
+                median_wealth=round(outcome.median_wealth, 2),
+                worst_case=round(outcome.worst_case, 2),
+                best_case=round(outcome.best_case, 2),
+                opportunity_cost=round(opportunity_cost, 2),
             )
         )
 
@@ -269,7 +256,7 @@ def evaluate_global_impact(
         policy_versions=policy_versions,
 
         supporting_engines={
-            "commitment_lock": commitment
+            "commitment_lock": commitment,
         },
 
         summary=summary,

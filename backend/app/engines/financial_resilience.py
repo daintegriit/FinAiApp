@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional, Literal
 from pydantic import BaseModel, Field
 
 from app.engines.commitment_lock import evaluate_commitment_lock
-from app.policy.policy_registry import get_policy_versions
+from app.policy.tax_models.policy_registry import get_policy_versions
 from app.schemas.commitment_lock import CommitmentLockRequest
 
 

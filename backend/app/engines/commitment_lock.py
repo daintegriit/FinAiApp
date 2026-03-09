@@ -16,7 +16,7 @@ from app.schemas.commitment_lock import (
 )
 
 from app.policy.resolver import resolve_net_monthly_income
-from app.policy.policy_registry import get_policy_versions
+from app.policy.tax_models.policy_registry import get_policy_versions
 
 
 ENGINE_VERSION = "commitment_lock_v1"

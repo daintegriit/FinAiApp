@@ -7,12 +7,12 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from app.engines.financial_state_engine import evaluate_financial_state
+from app.engines.financial_state import evaluate_financial_state
 from app.schemas.commitment_lock import CommitmentLockRequest
-from app.policy.policy_registry import get_policy_versions
+from app.policy.tax_models.policy_registry import get_policy_versions
 
 
-ENGINE_VERSION = "financial_explanation_engine_v1"
+ENGINE_VERSION = "financial_explanation_engine_v3"
 
 
 # --------------------------------------------------
@@ -81,22 +81,27 @@ def _safe_get(obj: Any, field: str, default: Any = None) -> Any:
 def _score_band(score: Optional[float]) -> Optional[ExplanationBand]:
     if score is None:
         return None
+
     if score >= 70:
         return ExplanationBand(label="healthy", min_score=70, max_score=100)
+
     if score >= 50:
         return ExplanationBand(label="caution", min_score=50, max_score=69)
+
     if score >= 30:
         return ExplanationBand(label="fragile", min_score=30, max_score=49)
+
     return ExplanationBand(label="critical", min_score=0, max_score=29)
 
 
 def _add_finding(
     findings: list[ExplanationFinding],
-    category: Literal["risk_driver", "strength", "constraint", "opportunity", "recommendation"],
+    category: Literal["risk_driver","strength","constraint","opportunity","recommendation"],
     title: str,
     detail: str,
-    severity: Literal["low", "medium", "high"],
+    severity: Literal["low","medium","high"],
 ) -> None:
+
     findings.append(
         ExplanationFinding(
             category=category,
@@ -112,19 +117,32 @@ def _add_finding(
 # --------------------------------------------------
 
 def _extract_findings(state: dict[str, Any]) -> list[ExplanationFinding]:
+
     findings: list[ExplanationFinding] = []
 
-    commitment = state.get("engines", {}).get("commitment_lock")
-    volatility = state.get("engines", {}).get("income_volatility")
-    macro = state.get("engines", {}).get("macro_sensitivity")
-    peer = state.get("engines", {}).get("peer_benchmark")
-    impact = state.get("engines", {}).get("global_impact")
-    resilience = state.get("engines", {}).get("financial_resilience")
-    optionality = state.get("engines", {}).get("financial_optionality")
-    identity = state.get("engines", {}).get("financial_identity")
-    drift = state.get("engines", {}).get("behavioral_drift")
+    engines = state.get("engines", {})
 
-    # Commitment
+    commitment = engines.get("commitment_lock")
+    volatility = engines.get("income_volatility")
+    macro = engines.get("macro_sensitivity")
+    peer = engines.get("peer_benchmark")
+    trajectory = engines.get("peer_trajectory")
+    impact = engines.get("global_impact")
+    resilience = engines.get("financial_resilience")
+    optionality = engines.get("financial_optionality")
+    identity = engines.get("financial_identity")
+    drift = engines.get("behavioral_drift")
+
+    portfolio = engines.get("portfolio_growth")
+    shock = engines.get("shock_simulator")
+    decision = engines.get("decision_delta")
+    
+
+
+    # --------------------------------------------------
+    # Commitment Lock
+    # --------------------------------------------------
+
     lock_score = _safe_get(commitment, "lock_score")
     income_share = _safe_get(commitment, "income_share")
     free_cashflow_share = _safe_get(commitment, "free_cashflow_share")
@@ -134,33 +152,17 @@ def _extract_findings(state: dict[str, Any]) -> list[ExplanationFinding]:
             findings,
             "risk_driver",
             "High commitment rigidity",
-            "Current recurring obligations create a strong lock-in effect and reduce financial maneuverability.",
+            "Recurring obligations significantly reduce financial maneuverability.",
             "high",
-        )
-    elif lock_score is not None and lock_score >= 50:
-        _add_finding(
-            findings,
-            "constraint",
-            "Moderate commitment pressure",
-            "Current obligations reduce flexibility and should be monitored before taking on additional fixed costs.",
-            "medium",
         )
 
     if free_cashflow_share is not None and free_cashflow_share >= 0.8:
         _add_finding(
             findings,
             "risk_driver",
-            "Free cashflow is heavily consumed",
-            "The current commitment consumes most available discretionary cashflow, increasing fragility.",
+            "Free cashflow heavily consumed",
+            "Most discretionary income is committed to recurring obligations.",
             "high",
-        )
-    elif free_cashflow_share is not None and free_cashflow_share < 0.3:
-        _add_finding(
-            findings,
-            "strength",
-            "Strong discretionary buffer",
-            "The commitment leaves a meaningful amount of discretionary cashflow available.",
-            "low",
         )
 
     if income_share is not None and income_share < 0.1:
@@ -168,227 +170,310 @@ def _extract_findings(state: dict[str, Any]) -> list[ExplanationFinding]:
             findings,
             "strength",
             "Low income burden",
-            "The commitment represents a relatively small share of monthly income.",
+            "Commitments represent a small portion of income.",
             "low",
         )
 
-    # Volatility
+
+    # --------------------------------------------------
+    # Income Volatility
+    # --------------------------------------------------
+
     volatility_score = _safe_get(volatility, "volatility_score")
+
     if volatility_score is not None and volatility_score >= 70:
         _add_finding(
             findings,
             "risk_driver",
             "Income shock vulnerability",
-            "A moderate income disruption could materially strain the ability to sustain commitments.",
+            "Income instability could threaten sustainability of commitments.",
             "high",
         )
-    elif volatility_score is not None and volatility_score < 30:
-        _add_finding(
-            findings,
-            "strength",
-            "Income resilience under stress",
-            "The current structure appears relatively resilient under modeled income shock scenarios.",
-            "low",
-        )
 
-    # Macro
+
+    # --------------------------------------------------
+    # Macro Sensitivity
+    # --------------------------------------------------
+
     macro_score = _safe_get(macro, "macro_sensitivity_score")
+
     if macro_score is not None and macro_score >= 70:
         _add_finding(
             findings,
             "risk_driver",
             "High macro sensitivity",
-            "The current financial structure is highly exposed to inflation, recession, or cost-of-living pressure.",
+            "Financial structure exposed to inflation and economic stress.",
             "high",
         )
 
-    # Peer
+
+    # --------------------------------------------------
+    # Peer Benchmark
+    # --------------------------------------------------
+
     peer_score = _safe_get(peer, "peer_score")
+
     if peer_score is not None and peer_score < 40:
         _add_finding(
             findings,
             "constraint",
             "Below-peer financial positioning",
-            "Current commitment structure appears heavier than peer benchmarks for similar households.",
+            "Commitment structure appears heavier than comparable households.",
             "medium",
         )
-    elif peer_score is not None and peer_score >= 70:
+
+
+    # --------------------------------------------------
+    # Peer Trajectory (NEW)
+    # --------------------------------------------------
+
+    trajectory_score = _safe_get(trajectory, "trajectory_score")
+    gap20 = _safe_get(trajectory, "estimated_peer_gap_20y")
+    gap30 = _safe_get(trajectory, "estimated_peer_gap_30y")
+
+    if trajectory_score is not None and trajectory_score < 30 and gap30 is not None:
+        
+        _add_finding(
+            findings,
+            "risk_driver",
+            "Long-term trajectory materially below peers",
+            f"Projected wealth path may fall approximately {abs(gap30):,.0f} behind peers over 30 years.",
+            "high",
+        )
+
+    elif trajectory_score is not None and trajectory_score >= 70 and gap30 is not None:
+
         _add_finding(
             findings,
             "strength",
-            "Strong peer-relative position",
-            "Current obligations appear conservative relative to comparable peer households.",
+            "Long-term trajectory ahead of peers",
+            f"Projected wealth path exceeds peers by approximately {gap30:,.0f} over 30 years.",
             "low",
         )
 
-    # Impact
+
+    # --------------------------------------------------
+    # Global Impact
+    # --------------------------------------------------
+
     impact_score = _safe_get(impact, "impact_score")
     lifetime_cost = _safe_get(impact, "lifetime_opportunity_cost")
+
     if impact_score is not None and impact_score >= 70:
+
         _add_finding(
             findings,
             "risk_driver",
             "Large long-term wealth drag",
-            "The modeled commitment materially reduces long-term investment capacity and creates significant opportunity cost.",
+            "Commitment significantly reduces investment capacity.",
             "high",
         )
-    elif lifetime_cost is not None and lifetime_cost > 0:
+
+    elif lifetime_cost:
+
         _add_finding(
             findings,
             "opportunity",
-            "Investment tradeoff identified",
-            f"The decision carries an estimated long-term opportunity cost of approximately {lifetime_cost:,.2f} in modeled future value.",
+            "Investment opportunity cost detected",
+            f"Estimated lifetime opportunity cost ≈ {lifetime_cost:,.0f}.",
             "medium",
         )
 
-    # Resilience
-    resilience_score = _safe_get(resilience, "resilience_score")
-    if resilience_score is not None and resilience_score < 40:
-        _add_finding(
-            findings,
-            "risk_driver",
-            "Low overall resilience",
-            "Combined signals indicate reduced capacity to absorb financial shocks while maintaining current obligations.",
-            "high",
-        )
-    elif resilience_score is not None and resilience_score >= 70:
+
+    # --------------------------------------------------
+    # Portfolio Growth
+    # --------------------------------------------------
+
+    portfolio_value = _safe_get(portfolio, "final_value")
+
+    if portfolio_value is not None and portfolio_value >= 1_000_000:
+
         _add_finding(
             findings,
             "strength",
-            "Strong overall resilience",
-            "Combined signals suggest the current financial structure remains comparatively robust.",
+            "Strong long-term investment trajectory",
+            f"Projected portfolio value ≈ {portfolio_value:,.0f}.",
             "low",
         )
 
-    # Optionality
-    optionality_score = _safe_get(optionality, "optionality_score")
-    if optionality_score is not None and optionality_score < 40:
+    elif portfolio_value is not None and portfolio_value < 100_000:
+
         _add_finding(
             findings,
             "constraint",
-            "Reduced financial optionality",
-            "The commitment structure may limit relocation, career pivots, and future financial choices.",
+            "Limited investment accumulation",
+            "Investment contributions may be insufficient for long-term goals.",
             "medium",
         )
 
-    # Identity
+    
+    # --------------------------------------------------
+    # Decision Delta
+    # --------------------------------------------------
+
+    wealth_delta = _safe_get(decision, "wealth_delta")
+    delta_band = _safe_get(decision, "delta_band")
+
+    if wealth_delta is not None:
+
+        if wealth_delta <= -250000:
+            
+            _add_finding(
+                findings,
+                "risk_driver",
+                "Purchase materially reduces long-term wealth",
+                f"This decision may reduce projected wealth by approximately {abs(wealth_delta):,.0f} over 30 years.",
+                "high",
+            )
+
+        elif wealth_delta <= -50000:
+
+            _add_finding(
+                findings,
+                "constraint",
+                "Purchase reduces long-term wealth trajectory",
+                f"Projected lifetime wealth impact ≈ {abs(wealth_delta):,.0f}.",
+                "medium",
+            )
+
+        elif wealth_delta > 100000:
+
+            _add_finding(
+                findings,
+                "opportunity",
+                "Decision improves long-term wealth",
+                f"Projected wealth increase ≈ {wealth_delta:,.0f} over 30 years.",
+                "low",
+            )
+
+
+    # --------------------------------------------------
+    # Shock Simulator
+    # --------------------------------------------------
+
+    shock_survival = _safe_get(shock, "survival_probability")
+
+    if shock_survival is not None and shock_survival < 0.4:
+
+        _add_finding(
+            findings,
+            "risk_driver",
+            "Low financial shock survival probability",
+            "Simulated economic shocks indicate elevated financial stress risk.",
+            "high",
+        )
+
+    elif shock_survival is not None and shock_survival >= 0.75:
+
+        _add_finding(
+            findings,
+            "strength",
+            "High shock survival probability",
+            "Financial structure appears resilient under simulated shocks.",
+            "low",
+        )
+
+
+    # --------------------------------------------------
+    # Financial Resilience
+    # --------------------------------------------------
+
+    resilience_score = _safe_get(resilience, "resilience_score")
+
+    if resilience_score is not None and resilience_score < 40:
+
+        _add_finding(
+            findings,
+            "risk_driver",
+            "Low systemic resilience",
+            "Combined indicators suggest limited shock absorption capacity.",
+            "high",
+        )
+
+
+    # --------------------------------------------------
+    # Financial Identity
+    # --------------------------------------------------
+
     dominant_identity = _safe_get(identity, "dominant_identity")
+
     if dominant_identity:
+
         _add_finding(
             findings,
             "opportunity",
             "Financial identity detected",
-            f"The current profile most closely aligns with the '{dominant_identity}' financial identity pattern.",
+            f"Profile resembles '{dominant_identity}' financial behavior pattern.",
             "low",
         )
 
-    # Drift
+
+    # --------------------------------------------------
+    # Behavioral Drift
+    # --------------------------------------------------
+
     drift_score = _safe_get(drift, "drift_score")
+
     if drift_score is not None and drift_score >= 70:
+
         _add_finding(
             findings,
             "risk_driver",
             "Behavioral drift detected",
-            "Recent movement in commitment pressure suggests worsening financial behavior trends over time.",
-            "high",
-        )
-    elif drift_score is not None and drift_score < 25:
-        _add_finding(
-            findings,
-            "strength",
-            "Behavior stable or improving",
-            "Current behavior signals suggest either stable or improving financial trajectory.",
-            "low",
-        )
-
-    # General recommendations
-    if lock_score is not None and lock_score >= 60:
-        _add_finding(
-            findings,
-            "recommendation",
-            "Avoid adding new fixed costs",
-            "Delay additional recurring obligations until commitment rigidity improves.",
+            "Recent behavior trends indicate increasing commitment pressure.",
             "high",
         )
 
-    if free_cashflow_share is not None and free_cashflow_share >= 0.8:
-        _add_finding(
-            findings,
-            "recommendation",
-            "Increase liquidity buffer",
-            "Build or preserve discretionary cash reserves to reduce near-term fragility.",
-            "high",
-        )
 
-    if impact_score is not None and impact_score >= 50:
-        _add_finding(
-            findings,
-            "recommendation",
-            "Compare against investment alternatives",
-            "Evaluate whether the long-term value of the purchase justifies the modeled opportunity cost.",
-            "medium",
-        )
+    # --------------------------------------------------
+    # Default
+    # --------------------------------------------------
 
     if not findings:
+
         _add_finding(
             findings,
             "strength",
             "No major risk drivers identified",
-            "The current engine stack did not detect a dominant financial weakness under present assumptions.",
+            "The engine stack did not detect dominant financial weaknesses.",
             "low",
         )
 
     return findings
 
 
-def _build_executive_summary(score: Optional[float], band: Optional[str], findings: list[ExplanationFinding]) -> str:
+# --------------------------------------------------
+# Summaries
+# --------------------------------------------------
+
+def _build_executive_summary(score: Optional[float], band: Optional[str], findings):
+
     if score is None:
-        return (
-            "The financial state engine completed with limited scoring visibility. "
-            "Structured findings were generated, but an overall score was unavailable."
-        )
+        return "Financial analysis completed but global score unavailable."
 
-    top_high = [f.title for f in findings if f.severity == "high"][:3]
-
-    if band == "critical":
-        return (
-            f"Overall financial state is critical with a global score of {score:.2f}. "
-            f"Primary issues include: {', '.join(top_high) if top_high else 'multiple high-severity constraints'}."
-        )
-
-    if band == "fragile":
-        return (
-            f"Overall financial state is fragile with a global score of {score:.2f}. "
-            f"The system identified notable stress across commitments, flexibility, or resilience."
-        )
-
-    if band == "caution":
-        return (
-            f"Overall financial state requires caution with a global score of {score:.2f}. "
-            f"There are manageable strengths, but also identifiable constraints that should be monitored."
-        )
+    top = [f.title for f in findings if f.severity == "high"][:3]
 
     return (
-        f"Overall financial state appears healthy with a global score of {score:.2f}. "
-        f"The current profile shows more strengths than material financial stressors."
+        f"Overall financial state score is {score:.2f}. "
+        f"Primary drivers include: {', '.join(top) if top else 'no critical drivers'}."
     )
 
 
-def _build_user_summary(score: Optional[float], band: Optional[str], findings: list[ExplanationFinding]) -> str:
-    risk_drivers = [f for f in findings if f.category == "risk_driver"][:2]
-    strengths = [f for f in findings if f.category == "strength"][:2]
+def _build_user_summary(score: Optional[float], band: Optional[str], findings):
 
-    risk_text = "; ".join(f.detail for f in risk_drivers) if risk_drivers else "No dominant risk drivers were detected."
-    strength_text = "; ".join(f.detail for f in strengths) if strengths else "The profile should continue to be monitored as more history becomes available."
+    risks = [f.detail for f in findings if f.category == "risk_driver"][:2]
+    strengths = [f.detail for f in findings if f.category == "strength"][:2]
+
+    risk_text = "; ".join(risks) if risks else "No dominant risks detected."
+    strength_text = "; ".join(strengths) if strengths else "Financial structure appears stable."
 
     if score is None:
         return f"{risk_text} {strength_text}"
 
     return (
-        f"Your current financial state score is {score:.2f}"
-        + (f" ({band}). " if band else ". ")
-        + f"Main risk picture: {risk_text} "
-        + f"Main strengths: {strength_text}"
+        f"Financial score: {score:.2f}. "
+        f"Key risks: {risk_text} "
+        f"Strengths: {strength_text}"
     )
 
 
@@ -397,29 +482,32 @@ def _build_user_summary(score: Optional[float], band: Optional[str], findings: l
 # --------------------------------------------------
 
 def evaluate_financial_explanation(req: CommitmentLockRequest) -> FinancialExplanationResponse:
+
     start = time.perf_counter()
 
     request_id = str(uuid.uuid4())
     timestamp = datetime.utcnow()
 
     policy_versions = get_policy_versions()
+
     state = evaluate_financial_state(req)
 
     global_score = state.get("global_financial_score")
+
     band = _score_band(global_score)
 
     findings = _extract_findings(state)
 
     executive_summary = _build_executive_summary(
-        score=global_score,
-        band=band.label if band else None,
-        findings=findings,
+        global_score,
+        band.label if band else None,
+        findings
     )
 
     user_summary = _build_user_summary(
-        score=global_score,
-        band=band.label if band else None,
-        findings=findings,
+        global_score,
+        band.label if band else None,
+        findings
     )
 
     processing_ms = int((time.perf_counter() - start) * 1000)
