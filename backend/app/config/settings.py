@@ -16,17 +16,12 @@ class Settings(BaseSettings):
     )
 
     # --------------------------------------------------
-    # Application Metadata
+    # Application
     # --------------------------------------------------
 
-    APP_NAME: str = "FinAI Financial Simulation Platform"
-
+    APP_NAME: str = "FinAI API"
     APP_VERSION: str = "1.0.0"
-
-    ENV: str = Field(
-        default="development",
-        description="Application environment"
-    )
+    ENVIRONMENT: str = "development"
 
     DEBUG: bool = True
 
@@ -35,7 +30,6 @@ class Settings(BaseSettings):
     # --------------------------------------------------
 
     HOST: str = "0.0.0.0"
-
     PORT: int = 8080
 
     # --------------------------------------------------
@@ -48,16 +42,11 @@ class Settings(BaseSettings):
 
     DB_ECHO: bool = False
 
-    DB_POOL_SIZE: int = 10
-
-    DB_MAX_OVERFLOW: int = 20
-
     # --------------------------------------------------
-    # Security
+    # JWT / Auth
     # --------------------------------------------------
 
     JWT_SECRET_KEY: str = "CHANGE_ME_SECRET"
-
     JWT_ALGORITHM: str = "HS256"
 
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
@@ -72,19 +61,8 @@ class Settings(BaseSettings):
     ]
 
     CORS_ALLOW_CREDENTIALS: bool = True
-
     CORS_ALLOW_METHODS: List[str] = ["*"]
-
     CORS_ALLOW_HEADERS: List[str] = ["*"]
-
-    # --------------------------------------------------
-    # Feature Flags
-    # --------------------------------------------------
-
-    ENABLE_SCENARIO_ENGINE: bool = True
-    ENABLE_PORTFOLIO_ENGINE: bool = True
-    ENABLE_FINANCIAL_ANALYSIS: bool = True
-    ENABLE_COMMITMENT_LOCK: bool = True
 
 
 @lru_cache

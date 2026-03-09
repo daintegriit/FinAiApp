@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, List, Literal
+from typing import Optional, Literal
 from datetime import datetime
 from decimal import Decimal
 
@@ -41,70 +41,76 @@ def validate_country(code: str) -> str:
 
 
 # --------------------------------------------------
-# Portfolio Asset Allocation
+# Tax Policy
 # --------------------------------------------------
 
-class AssetAllocation(BaseModel):
+class TaxPolicy(BaseModel):
 
-    asset_class: Literal[
-        "equities",
-        "bonds",
-        "real_estate",
-        "commodities",
-        "crypto",
-        "cash",
-        "other"
-    ]
+    effective_tax_rate: Optional[Decimal] = Field(None, ge=0, le=1)
 
-    allocation_percent: Decimal = Field(..., ge=0, le=1)
+    tax_bracket: Optional[str] = None
 
-    expected_return: Optional[Decimal] = Field(None, ge=0)
-    volatility: Optional[Decimal] = Field(None, ge=0)
+    tax_model: Optional[
+        Literal[
+            "flat",
+            "progressive",
+            "regional_estimate"
+        ]
+    ] = None
+
+    fallback_used: Optional[bool] = None
 
     model_config = {"frozen": True}
 
 
 # --------------------------------------------------
-# Portfolio Assumptions
+# Macro Policy
 # --------------------------------------------------
 
-class PortfolioAssumptions(BaseModel):
+class MacroPolicy(BaseModel):
 
-    annual_return: Decimal = Field(..., ge=0)
-    volatility: Optional[Decimal] = Field(None, ge=0)
-    annual_inflation: Optional[Decimal] = Field(None, ge=0)
+    expected_market_return: Optional[Decimal] = Field(None, ge=0)
+    expected_inflation: Optional[Decimal] = Field(None, ge=0)
 
-    source: Literal[
-        "user",
-        "policy_engine",
-        "market_estimate"
-    ]
+    risk_free_rate: Optional[Decimal] = Field(None, ge=0)
+
+    volatility_band: Optional[
+        Literal[
+            "low",
+            "moderate",
+            "high"
+        ]
+    ] = None
 
     model_config = {"frozen": True}
 
 
 # --------------------------------------------------
-# Monte Carlo Summary
+# Income Policy
 # --------------------------------------------------
 
-class MonteCarloSummary(BaseModel):
+class IncomePolicy(BaseModel):
 
-    simulations: int
+    income_stability_score: Optional[Decimal] = None
 
-    median_outcome: Decimal
-    p10_outcome: Decimal
-    p90_outcome: Decimal
+    employment_risk: Optional[
+        Literal[
+            "low",
+            "moderate",
+            "high"
+        ]
+    ] = None
 
-    probability_of_loss: Optional[Decimal] = None
+    income_growth_assumption: Optional[Decimal] = None
 
     model_config = {"frozen": True}
 
 
 # --------------------------------------------------
-# Request Schema
+# Policy Request
 # --------------------------------------------------
 
-class PortfolioRequest(BaseModel):
+class PolicyRequest(BaseModel):
 
     schema_version: str = "2.0"
 
@@ -119,22 +125,21 @@ class PortfolioRequest(BaseModel):
 
     timezone: Optional[str] = "UTC"
 
-    # Portfolio inputs
-    current_portfolio_value: Optional[Decimal] = Field(None, ge=0)
+    # Financial inputs used for policy modeling
+    income: Optional[Decimal] = Field(None, gt=0)
+    assets: Optional[Decimal] = Field(None, ge=0)
 
-    monthly_contribution: Decimal = Field(..., ge=0)
+    age: Optional[int] = Field(None, ge=18, le=100)
 
-    years: int = Field(..., ge=1, le=80)
-
-    # Return assumptions
-    annual_return: Decimal = Field(..., ge=0)
-    volatility: Optional[Decimal] = Field(None, ge=0)
-
-    # Monte Carlo simulations
-    simulations: int = Field(default=1000, ge=100, le=100000)
-
-    # Optional asset allocation
-    allocations: Optional[List[AssetAllocation]] = None
+    employment_type: Optional[
+        Literal[
+            "salary",
+            "self_employed",
+            "contract",
+            "student",
+            "retired"
+        ]
+    ] = None
 
     # Validators
     @field_validator("currency")
@@ -149,13 +154,14 @@ class PortfolioRequest(BaseModel):
 
 
 # --------------------------------------------------
-# Response Schema
+# Policy Response
 # --------------------------------------------------
 
-class PortfolioResponse(BaseModel):
+class PolicyResponse(BaseModel):
 
     schema_version: str = "2.0"
-    engine_version: str
+
+    policy_version: str
 
     request_id: Optional[str] = None
     trace_id: Optional[str] = None
@@ -167,33 +173,24 @@ class PortfolioResponse(BaseModel):
     currency: str
     region: Optional[str] = None
 
-    # Inputs
-    monthly_contribution: Decimal
-    years: int
+    # Policy components
+    tax_policy: Optional[TaxPolicy] = None
+    macro_policy: Optional[MacroPolicy] = None
+    income_policy: Optional[IncomePolicy] = None
 
-    # Portfolio projections
-    projected_value: Decimal
-    total_contributions: Decimal
-    investment_growth: Decimal
-
-    # Inflation-adjusted value
-    real_value_adjusted: Optional[Decimal] = None
-
-    # Monte Carlo output
-    monte_carlo: Optional[MonteCarloSummary] = None
-
-    # Assumptions used
-    assumptions_used: Optional[PortfolioAssumptions] = None
-
-    # Confidence level
-    projection_confidence: Optional[
-        Literal["low", "medium", "high"]
+    # Policy confidence
+    policy_confidence: Optional[
+        Literal[
+            "low",
+            "medium",
+            "high"
+        ]
     ] = None
 
     # Data completeness
     data_completeness: Optional[Decimal] = None
 
-    # Currency validator
+    # Currency validation
     @field_validator("currency")
     @classmethod
     def validate_currency(cls, v: str) -> str:

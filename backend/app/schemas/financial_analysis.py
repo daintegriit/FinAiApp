@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, List, Literal
+from typing import Optional, Dict, Any, List, Literal
 from datetime import datetime
 from decimal import Decimal
 
@@ -9,7 +9,7 @@ import pycountry
 
 
 # --------------------------------------------------
-# ISO Currency Validation
+# Utility: ISO Currency Validation
 # --------------------------------------------------
 
 def validate_iso_currency(code: str) -> str:
@@ -25,7 +25,7 @@ def validate_iso_currency(code: str) -> str:
 
 
 # --------------------------------------------------
-# ISO Country Validation
+# Utility: ISO Country Validation
 # --------------------------------------------------
 
 def validate_country(code: str) -> str:
@@ -41,61 +41,42 @@ def validate_country(code: str) -> str:
 
 
 # --------------------------------------------------
-# Portfolio Asset Allocation
+# Engine Metadata
 # --------------------------------------------------
 
-class AssetAllocation(BaseModel):
+class EngineMeta(BaseModel):
 
-    asset_class: Literal[
-        "equities",
-        "bonds",
-        "real_estate",
-        "commodities",
-        "crypto",
-        "cash",
-        "other"
-    ]
-
-    allocation_percent: Decimal = Field(..., ge=0, le=1)
-
-    expected_return: Optional[Decimal] = Field(None, ge=0)
-    volatility: Optional[Decimal] = Field(None, ge=0)
+    name: str
+    version: str
+    processing_ms: Optional[int] = None
 
     model_config = {"frozen": True}
 
 
 # --------------------------------------------------
-# Portfolio Assumptions
+# Explainability
 # --------------------------------------------------
 
-class PortfolioAssumptions(BaseModel):
+class ExplanationItem(BaseModel):
 
-    annual_return: Decimal = Field(..., ge=0)
-    volatility: Optional[Decimal] = Field(None, ge=0)
-    annual_inflation: Optional[Decimal] = Field(None, ge=0)
-
-    source: Literal[
-        "user",
-        "policy_engine",
-        "market_estimate"
-    ]
+    code: str
+    message: str
+    severity: Literal["low", "medium", "high"]
 
     model_config = {"frozen": True}
 
 
 # --------------------------------------------------
-# Monte Carlo Summary
+# Financial Health Snapshot
 # --------------------------------------------------
 
-class MonteCarloSummary(BaseModel):
+class FinancialHealthSnapshot(BaseModel):
 
-    simulations: int
-
-    median_outcome: Decimal
-    p10_outcome: Decimal
-    p90_outcome: Decimal
-
-    probability_of_loss: Optional[Decimal] = None
+    income: Optional[Decimal] = None
+    expenses: Optional[Decimal] = None
+    savings_rate: Optional[Decimal] = None
+    debt_ratio: Optional[Decimal] = None
+    cashflow: Optional[Decimal] = None
 
     model_config = {"frozen": True}
 
@@ -104,7 +85,7 @@ class MonteCarloSummary(BaseModel):
 # Request Schema
 # --------------------------------------------------
 
-class PortfolioRequest(BaseModel):
+class FinancialAnalysisRequest(BaseModel):
 
     schema_version: str = "2.0"
 
@@ -116,25 +97,22 @@ class PortfolioRequest(BaseModel):
     # Global context
     currency: str = Field(default="USD", min_length=3, max_length=3)
     region: str = Field(default="US", min_length=2, max_length=2)
-
     timezone: Optional[str] = "UTC"
 
-    # Portfolio inputs
-    current_portfolio_value: Optional[Decimal] = Field(None, ge=0)
+    # Core financial inputs
+    monthly_income: Optional[Decimal] = Field(None, gt=0)
+    monthly_expenses: Optional[Decimal] = Field(None, gt=0)
 
-    monthly_contribution: Decimal = Field(..., ge=0)
+    total_assets: Optional[Decimal] = Field(None, ge=0)
+    total_liabilities: Optional[Decimal] = Field(None, ge=0)
 
-    years: int = Field(..., ge=1, le=80)
+    monthly_investments: Optional[Decimal] = Field(None, ge=0)
 
-    # Return assumptions
-    annual_return: Decimal = Field(..., ge=0)
-    volatility: Optional[Decimal] = Field(None, ge=0)
-
-    # Monte Carlo simulations
-    simulations: int = Field(default=1000, ge=100, le=100000)
-
-    # Optional asset allocation
-    allocations: Optional[List[AssetAllocation]] = None
+    # Engine toggles
+    include_commitment_engine: bool = True
+    include_portfolio_engine: bool = True
+    include_policy_engine: bool = True
+    include_scenario_engine: bool = False
 
     # Validators
     @field_validator("currency")
@@ -152,10 +130,11 @@ class PortfolioRequest(BaseModel):
 # Response Schema
 # --------------------------------------------------
 
-class PortfolioResponse(BaseModel):
+class FinancialAnalysisResponse(BaseModel):
 
     schema_version: str = "2.0"
-    engine_version: str
+
+    engine_versions: Optional[List[EngineMeta]] = None
 
     request_id: Optional[str] = None
     trace_id: Optional[str] = None
@@ -167,30 +146,23 @@ class PortfolioResponse(BaseModel):
     currency: str
     region: Optional[str] = None
 
-    # Inputs
-    monthly_contribution: Decimal
-    years: int
+    # Financial snapshot
+    financial_health: Optional[FinancialHealthSnapshot] = None
 
-    # Portfolio projections
-    projected_value: Decimal
-    total_contributions: Decimal
-    investment_growth: Decimal
+    # Overall financial intelligence score
+    global_financial_score: Optional[Decimal] = None
 
-    # Inflation-adjusted value
-    real_value_adjusted: Optional[Decimal] = None
-
-    # Monte Carlo output
-    monte_carlo: Optional[MonteCarloSummary] = None
-
-    # Assumptions used
-    assumptions_used: Optional[PortfolioAssumptions] = None
-
-    # Confidence level
-    projection_confidence: Optional[
-        Literal["low", "medium", "high"]
+    risk_level: Optional[
+        Literal["low", "moderate", "high", "critical"]
     ] = None
 
-    # Data completeness
+    # Engine outputs
+    engines: Optional[Dict[str, Any]] = None
+
+    # Explainability
+    explanations: Optional[List[ExplanationItem]] = None
+
+    # Data integrity
     data_completeness: Optional[Decimal] = None
 
     # Currency validator

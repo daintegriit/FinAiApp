@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, List, Literal
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 import pycountry
@@ -14,6 +15,7 @@ from app.policy.context import FinancialContext
 # --------------------------------------------------
 
 def validate_iso_currency(code: str) -> str:
+
     code = code.upper()
 
     currency = pycountry.currencies.get(alpha_3=code)
@@ -29,6 +31,7 @@ def validate_iso_currency(code: str) -> str:
 # --------------------------------------------------
 
 def validate_country(code: str) -> str:
+
     code = code.upper()
 
     country = pycountry.countries.get(alpha_2=code)
@@ -45,8 +48,8 @@ def validate_country(code: str) -> str:
 
 class Assumptions(BaseModel):
 
-    annual_return: float
-    annual_inflation: float
+    annual_return: Decimal = Field(..., ge=0)
+    annual_inflation: Decimal = Field(..., ge=0)
 
     source: Literal["user", "default", "regional"]
 
@@ -72,11 +75,35 @@ class PolicyVersions(BaseModel):
 
 class CommitmentLockRequest(BaseModel):
 
+    # -----------------------------
+    # Request Metadata
+    # -----------------------------
+
+    schema_version: str = "2.0"
+
+    request_id: Optional[str] = Field(
+        default=None,
+        description="Unique request identifier for tracing"
+    )
+
+    trace_id: Optional[str] = Field(
+        default=None,
+        description="Distributed tracing ID"
+    )
+
+    client_timestamp: Optional[datetime] = None
+
+    # -----------------------------
     # Core commitment parameters
-    monthly_payment: float = Field(..., gt=0)
+    # -----------------------------
+
+    monthly_payment: Decimal = Field(..., gt=0)
     term_months: int = Field(..., gt=0, le=1200)
 
+    # -----------------------------
     # Currency context
+    # -----------------------------
+
     currency: str = Field(
         default="USD",
         min_length=3,
@@ -84,7 +111,10 @@ class CommitmentLockRequest(BaseModel):
         description="ISO 4217 currency code"
     )
 
+    # -----------------------------
     # Global economic context
+    # -----------------------------
+
     region: str = Field(
         default="US",
         min_length=2,
@@ -97,18 +127,26 @@ class CommitmentLockRequest(BaseModel):
         description="User timezone for financial calculations"
     )
 
-    # Engine context
     context: Optional[FinancialContext] = None
 
+    # -----------------------------
     # Income context
-    net_monthly_income: Optional[float] = Field(None, gt=0)
-    current_free_cashflow: Optional[float] = Field(None, gt=0)
+    # -----------------------------
 
+    net_monthly_income: Optional[Decimal] = Field(None, gt=0)
+    current_free_cashflow: Optional[Decimal] = Field(None, gt=0)
+
+    # -----------------------------
     # Economic assumptions
-    annual_return_assumption: Optional[float] = Field(None, ge=0, le=1)
-    annual_inflation_assumption: Optional[float] = Field(None, ge=0, le=1)
+    # -----------------------------
 
+    annual_return_assumption: Optional[Decimal] = Field(None, ge=0, le=1)
+    annual_inflation_assumption: Optional[Decimal] = Field(None, ge=0, le=1)
+
+    # -----------------------------
     # Decision context
+    # -----------------------------
+
     purchase_category: Optional[
         Literal[
             "housing",
@@ -126,11 +164,17 @@ class CommitmentLockRequest(BaseModel):
         le=80
     )
 
+    # -----------------------------
     # Goal modeling
-    goal_cost: Optional[float] = Field(None, gt=0)
-    goal_monthly_contribution: Optional[float] = Field(None, gt=0)
+    # -----------------------------
 
-    # Demographic context (optional but useful globally)
+    goal_cost: Optional[Decimal] = Field(None, gt=0)
+    goal_monthly_contribution: Optional[Decimal] = Field(None, gt=0)
+
+    # -----------------------------
+    # Demographic context
+    # -----------------------------
+
     age: Optional[int] = Field(None, ge=18, le=100)
 
     employment_type: Optional[
@@ -143,13 +187,20 @@ class CommitmentLockRequest(BaseModel):
         ]
     ] = None
 
-    # Metadata
+    # -----------------------------
+    # Client metadata
+    # -----------------------------
+
     client_version: Optional[str] = None
+
     request_origin: Optional[
         Literal["web", "mobile", "api", "partner"]
     ] = None
 
+    # -----------------------------
     # Validators
+    # -----------------------------
+
     @field_validator("currency")
     @classmethod
     def validate_currency(cls, v: str) -> str:
@@ -180,70 +231,113 @@ class ReasonCode(BaseModel):
 
 class CommitmentLockResponse(BaseModel):
 
-    schema_version: str = "1.1"
+    schema_version: str = "2.0"
     engine_version: str
 
     request_id: Optional[str] = None
+    trace_id: Optional[str] = None
 
     calculation_timestamp: Optional[datetime] = None
     processing_ms: Optional[int] = None
 
+    # -----------------------------
     # Context
+    # -----------------------------
+
     currency: str
     region: Optional[str] = None
 
+    # -----------------------------
     # Commitment information
-    total_paid: float
-    monthly_payment: float
+    # -----------------------------
+
+    total_paid: Decimal
+    monthly_payment: Decimal
     term_months: int
 
+    # -----------------------------
     # Economic assumptions used
-    annual_return_used: float
-    annual_inflation_used: float
+    # -----------------------------
 
+    annual_return_used: Decimal
+    annual_inflation_used: Decimal
+
+    # -----------------------------
     # Opportunity cost modeling
-    future_value_if_invested: float
+    # -----------------------------
 
+    future_value_if_invested: Decimal
+
+    # -----------------------------
     # Income ratios
-    income_share: Optional[float] = None
-    free_cashflow_share: Optional[float] = None
+    # -----------------------------
 
+    income_share: Optional[Decimal] = None
+    free_cashflow_share: Optional[Decimal] = None
+
+    # -----------------------------
     # Tax modeling
-    effective_tax_rate_used: Optional[float] = None
+    # -----------------------------
+
+    effective_tax_rate_used: Optional[Decimal] = None
     tax_fallback_used: Optional[bool] = None
 
     tax_confidence: Optional[
         Literal["low", "medium", "high"]
     ] = None
 
+    # -----------------------------
     # Policy tracking
+    # -----------------------------
+
     policy_versions: Optional[PolicyVersions] = None
 
+    # -----------------------------
     # Goal delay impact
+    # -----------------------------
+
     goal_delay_months: Optional[int] = None
 
+    # -----------------------------
     # Lock scoring
+    # -----------------------------
+
     lock_score: int
 
     lock_score_confidence: Optional[
         Literal["low", "medium", "high"]
     ] = None
 
+    # -----------------------------
     # Engine confidence
+    # -----------------------------
+
     engine_confidence: Optional[
         Literal["low", "medium", "high"]
     ] = None
 
+    # -----------------------------
     # Explainability
+    # -----------------------------
+
     reasons: List[ReasonCode]
 
+    # -----------------------------
     # Assumptions metadata
+    # -----------------------------
+
     assumptions_used: Optional[Assumptions] = None
 
-    # Data completeness (global system metric)
-    data_completeness: Optional[float] = None
+    # -----------------------------
+    # Data completeness
+    # -----------------------------
 
-    # Currency validator
+    data_completeness: Optional[Decimal] = None
+
+    # -----------------------------
+    # Currency validation
+    # -----------------------------
+
     @field_validator("currency")
     @classmethod
     def validate_currency(cls, v: str) -> str:
