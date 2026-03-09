@@ -14,8 +14,9 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Fallback for development / CI if no DB configured
 if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL not configured")
+    DATABASE_URL = "sqlite:///./dev.db"
 
 
 # --------------------------------------------------
