@@ -8,6 +8,8 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
+from app.engines.engine_registry import register_engine
+
 
 ENGINE_VERSION = "portfolio_growth_v2"
 
@@ -127,6 +129,7 @@ def _percentile(data: List[float], p: float):
 # Engine
 # --------------------------------------------------
 
+@register_engine("portfolio")
 def evaluate_portfolio_growth(
     assumptions: PortfolioAssumptions,
 ) -> PortfolioGrowthResponse:
