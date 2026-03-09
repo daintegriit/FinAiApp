@@ -1,33 +1,29 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
-from app.engines.peer_benchmark import run_peer_benchmark
+from app.schemas.commitment_lock import CommitmentLockRequest
+from app.engines.peer_benchmark import (
+    evaluate_peer_benchmark,
+    PeerBenchmarkResponse
+)
 
 router = APIRouter(
     prefix="/benchmark",
-    tags=["Benchmark"]
+    tags=["Peer Benchmark"]
 )
 
 
-class BenchmarkRequest(BaseModel):
-    income: float
-    savings: float
-
-
-@router.post("/compare")
-def compare(req: BenchmarkRequest):
+@router.post("/evaluate", response_model=PeerBenchmarkResponse)
+def evaluate(req: CommitmentLockRequest):
 
     try:
 
-        result = run_peer_benchmark(
-            income=req.income,
-            savings=req.savings
-        )
+        result = evaluate_peer_benchmark(req)
 
-        return {
-            "status": "success",
-            "benchmark": result
-        }
+        return result
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Peer benchmark failed: {str(e)}"
+        )
