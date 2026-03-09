@@ -8,7 +8,7 @@ from typing import List
 from pydantic import BaseModel, Field
 
 from app.schemas.commitment_lock import CommitmentLockRequest
-from app.engines.financial_state_engine import evaluate_financial_state
+from app.engines.financial_state import evaluate_financial_state
 
 
 ENGINE_VERSION = "scenario_engine_v1"
