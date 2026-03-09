@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.engines.policy_validation import validate_policy
+from app.engines.policy import validate_policy
 
 router = APIRouter(
     prefix="/policy",
