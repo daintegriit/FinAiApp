@@ -26,6 +26,17 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r backend/requirements.txt
 
+    - name: Verify engine module imports
+      run: |
+        cd backend
+        python - <<'PY'
+        import pkgutil
+        import app.engines
+        for module in pkgutil.iter_modules(app.engines.path):
+            import(f"app.engines.{module.name}")
+        print("All engine modules imported successfully.")
+        PY
+
     - name: Run Financial Engine Validation
       run: |
         cd backend
