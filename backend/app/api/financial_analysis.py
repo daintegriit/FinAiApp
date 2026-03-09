@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import time
 from fastapi import APIRouter, HTTPException
 
 from app.schemas.commitment_lock import CommitmentLockRequest
-from app.engines.financial_explanation import evaluate_financial_explanation
 from app.engines.financial_state import evaluate_financial_state
+from app.engines.financial_explanation import evaluate_financial_explanation
 
 
 router = APIRouter(
@@ -16,17 +17,26 @@ router = APIRouter(
 @router.post("/analyze")
 def analyze_financial_state(request: CommitmentLockRequest):
 
+    start_time = time.perf_counter()
+
     try:
 
-        # Run raw engine system
+        # ------------------------------
+        # Core financial engine system
+        # ------------------------------
         state = evaluate_financial_state(request)
 
-        # Run explanation layer
+        # ------------------------------
+        # Explanation layer
+        # ------------------------------
         explanation = evaluate_financial_explanation(request)
 
+        elapsed = (time.perf_counter() - start_time) * 1000
+
         return {
+            "status": "success",
             "global_financial_score": state.get("global_financial_score"),
-            "processing_ms": state.get("processing_ms"),
+            "processing_ms": round(elapsed, 2),
             "engines": state.get("engines"),
             "explanation": explanation
         }
@@ -35,5 +45,8 @@ def analyze_financial_state(request: CommitmentLockRequest):
 
         raise HTTPException(
             status_code=500,
-            detail=f"Financial analysis failed: {str(e)}"
+            detail={
+                "error": "Financial analysis failed",
+                "message": str(e)
+            }
         )
