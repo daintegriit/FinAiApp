@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import time
+import uuid
 import logging
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
+from sqlalchemy.orm import Session
 
 from app.schemas.commitment_lock import CommitmentLockRequest
 from app.schemas.financial_analysis import FinancialAnalysisResponse
 
 from app.engines.financial_explanation import evaluate_financial_explanation
 from app.services.financial_orchestrator import FinancialOrchestrator
+
+from app.db.session import get_db
 
 
 logger = logging.getLogger(__name__)
@@ -34,56 +38,89 @@ orchestrator = FinancialOrchestrator()
 )
 async def analyze_financial_state(
     request: CommitmentLockRequest,
+    db: Session = Depends(get_db),
 ) -> FinancialAnalysisResponse:
     """
-    Run the complete financial intelligence pipeline.
+    Execute the complete Financial Intelligence Pipeline.
 
-    This endpoint orchestrates multiple financial engines:
+    Engines executed through the registry-driven orchestrator:
 
     • Policy Engine
     • Portfolio Engine
     • Commitment Lock Engine
     • Scenario Engine
+    • Behavioral Drift Engine
 
-    The result is a unified financial score and explanation
-    describing the user's financial health.
+    Returns a unified financial analysis including
+    engine outputs, explanation, and processing metrics.
     """
 
+    request_id = str(uuid.uuid4())
     start_time = time.perf_counter()
 
     try:
 
-        logger.info("Financial analysis started")
+        logger.info(
+            "Financial analysis started",
+            extra={"request_id": request_id},
+        )
 
         # --------------------------------------------------
-        # Run Financial Orchestrator
+        # Run Financial Orchestrator (registry-driven)
         # --------------------------------------------------
 
-        orchestration = await orchestrator.run(request.dict())
+        orchestration = await orchestrator.run(
+            payload=request.model_dump(),
+            db=db,
+            request_id=request_id,
+        )
 
         engines = orchestration.get("engines", {})
+        engine_timings = orchestration.get("engine_timings", {})
+        run_id = orchestration.get("run_id")
 
         # --------------------------------------------------
-        # Explanation / Interpretation Engine
+        # Extract Global Financial Score (from policy engine)
+        # --------------------------------------------------
+
+        policy_result = engines.get("policy", {})
+        global_score = policy_result.get("global_financial_score")
+
+        # --------------------------------------------------
+        # Explanation Engine
         # --------------------------------------------------
 
         explanation = evaluate_financial_explanation(request)
 
+        # --------------------------------------------------
+        # Processing Time
+        # --------------------------------------------------
+
         elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
         logger.info(
-            "Financial analysis completed in %sms",
-            elapsed_ms
+            "Financial analysis completed",
+            extra={
+                "request_id": request_id,
+                "run_id": run_id,
+                "runtime_ms": elapsed_ms,
+            },
         )
+
+        # --------------------------------------------------
+        # Response
+        # --------------------------------------------------
 
         return FinancialAnalysisResponse(
             status="success",
 
-            global_financial_score=engines
-            .get("policy", {})
-            .get("global_financial_score"),
+            request_id=request_id,
+            run_id=run_id,
+
+            global_financial_score=global_score,
 
             engines=engines,
+            engine_timings=engine_timings,
 
             explanation=explanation,
 
@@ -97,8 +134,8 @@ async def analyze_financial_state(
     except ValueError as e:
 
         logger.warning(
-            "Financial analysis validation error: %s",
-            str(e),
+            "Financial analysis validation error",
+            extra={"request_id": request_id, "error": str(e)},
         )
 
         raise HTTPException(
@@ -112,12 +149,16 @@ async def analyze_financial_state(
 
     except Exception as e:
 
-        logger.exception("Financial analysis engine failure")
+        logger.exception(
+            "Financial analysis engine failure",
+            extra={"request_id": request_id},
+        )
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "error": "Financial analysis failed",
+                "request_id": request_id,
                 "message": str(e),
             },
         )

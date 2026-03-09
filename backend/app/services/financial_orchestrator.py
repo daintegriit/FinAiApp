@@ -4,7 +4,7 @@ import asyncio
 import inspect
 import logging
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Callable
 
 # Ensure engine decorators run and populate registry
 import app.engines  # noqa: F401
@@ -42,8 +42,15 @@ class FinancialOrchestrator:
     """
 
     def __init__(self):
+
+        if not ENGINE_REGISTRY:
+            raise RuntimeError("ENGINE_REGISTRY is empty — engines failed to register")
+
         # Snapshot registry at initialization
-        self.engines = dict(ENGINE_REGISTRY)
+        self.engines: Dict[str, Callable] = dict(ENGINE_REGISTRY)
+
+        # Deterministic order (important for tests)
+        self.engine_order = sorted(self.engines.keys())
 
         # Maintain backward-compatible output keys
         self.output_aliases = {
@@ -53,6 +60,11 @@ class FinancialOrchestrator:
             "scenarios": "scenarios",
             "behavioral_drift": "behavioral_drift",
         }
+
+        logger.info(
+            "FinancialOrchestrator initialized with %s engines",
+            len(self.engines),
+        )
 
     # --------------------------------------------------
     # Input Normalization
@@ -79,7 +91,11 @@ class FinancialOrchestrator:
             "savings_rate": data.get("savings_rate"),
         }
 
-    def _build_engine_input(self, engine_name: str, data: Dict[str, Any]) -> Any:
+    def _build_engine_input(
+        self,
+        engine_name: str,
+        data: Dict[str, Any],
+    ) -> Any:
         """
         Convert shared orchestrator payload into engine-specific inputs.
         """
@@ -111,13 +127,15 @@ class FinancialOrchestrator:
     async def _run_engine(
         self,
         name: str,
-        engine: Any,
+        engine: Callable,
         data: Dict[str, Any],
     ) -> EngineResult:
 
         start = time.perf_counter()
 
         payload = self._build_engine_input(name, data)
+
+        logger.debug("Running engine: %s", name)
 
         try:
 
@@ -131,8 +149,13 @@ class FinancialOrchestrator:
             if inspect.iscoroutine(result):
                 result = await result
 
-        except Exception:
-            raise
+        except Exception as exc:
+
+            logger.exception("Engine failed: %s", name)
+
+            raise RuntimeError(
+                f"{name} engine failed: {str(exc)}"
+            ) from exc
 
         runtime = (time.perf_counter() - start) * 1000
 
@@ -150,10 +173,13 @@ class FinancialOrchestrator:
 
         start_total = time.perf_counter()
 
-        tasks = [
-            (name, self._run_engine(name, engine, data))
-            for name, engine in self.engines.items()
-        ]
+        tasks = []
+
+        for name in self.engine_order:
+            engine = self.engines[name]
+            tasks.append(
+                (name, self._run_engine(name, engine, data))
+            )
 
         results = await asyncio.gather(
             *[task for _, task in tasks],
@@ -169,7 +195,10 @@ class FinancialOrchestrator:
 
             if isinstance(result, Exception):
 
-                logger.exception("Engine failure: %s", registered_name)
+                logger.error(
+                    "Engine execution failure: %s",
+                    registered_name,
+                )
 
                 engine_outputs[output_name] = {
                     "status": "failed",
@@ -182,12 +211,21 @@ class FinancialOrchestrator:
             engine_outputs[result.name] = result.result
             engine_timings[result.name] = round(result.runtime_ms, 2)
 
-        total_runtime = round((time.perf_counter() - start_total) * 1000, 2)
+        total_runtime = round(
+            (time.perf_counter() - start_total) * 1000,
+            2,
+        )
+
+        logger.info(
+            "Financial orchestration completed | engines=%s runtime=%sms",
+            len(self.engines),
+            total_runtime,
+        )
 
         return {
             "engines": engine_outputs,
             "engine_timings": engine_timings,
             "total_runtime_ms": total_runtime,
             "engine_count": len(self.engines),
-            "registered_engines": list(self.engines.keys()),
+            "registered_engines": list(self.engine_order),
         }
