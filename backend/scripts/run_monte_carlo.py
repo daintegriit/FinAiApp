@@ -48,7 +48,18 @@ def generate_random_assumptions() -> PortfolioAssumptions:
         simulations=300,
     )
 
+def generate_random_scenario():
+    """
+    Compatibility wrapper returning a scenario dictionary
+    expected by tests.
+    """
 
+    return {
+        "market_return": random.uniform(0.04, 0.10),
+        "volatility": random.uniform(0.10, 0.30),
+        "inflation": random.uniform(0.01, 0.05),
+        "interest_rate": random.uniform(0.01, 0.06),
+    }
 # --------------------------------------------------
 # Simulation Runner
 # --------------------------------------------------
