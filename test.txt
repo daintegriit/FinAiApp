@@ -142,3 +142,16 @@ Set up migrations / DB bootstrap for when GCP details arrive
 Then
 
 Move into frontend/native integration confidently
+
+
+
+	1.	Keep SQLite for local dev only.
+	2.	Stand up Cloud SQL Postgres for production.
+	3.	Add DB migrations for all production tables you still need.
+	4.	Wire /financial/analyze so it persists runs + engine results into Cloud SQL.
+	5.	Containerize and deploy the API to Cloud Run.
+	6.	Move secrets to Secret Manager.
+	7.	Add an export path from Cloud SQL to BigQuery for analytics later.
+	8.	Put model artifacts / reports into Cloud Storage.
+
+That is the version that is actually elite, scalable, and GCP-native. The only thing I would decide before building further is whether you want Cloud SQL Postgres now, or whether you want to wait for the exact GCP DB credentials and finish the persistence wiring locally first.
