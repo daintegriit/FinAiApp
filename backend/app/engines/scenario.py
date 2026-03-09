@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.commitment_lock import CommitmentLockRequest
 from app.engines.financial_state import evaluate_financial_state
+from app.engines.engine_registry import register_engine
 
 
 ENGINE_VERSION = "scenario_engine_v1"
@@ -105,6 +106,7 @@ def _extract_findings(findings):
 # Scenario Engine
 # --------------------------------------------------
 
+@register_engine("scenarios")
 def evaluate_scenarios(
     scenarios: List[ScenarioInput],
 ) -> ScenarioEngineResponse:

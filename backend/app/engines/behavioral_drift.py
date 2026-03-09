@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from app.schemas.commitment_lock import CommitmentLockRequest
 from app.engines.commitment_lock import evaluate_commitment_lock
 from app.policy.tax_models.policy_registry import get_policy_versions
+from app.engines.engine_registry import register_engine
 
 
 ENGINE_VERSION = "behavioral_drift_v1"
@@ -89,31 +90,15 @@ def _safe_get(obj: Any, field: str, default=None):
 def _band(score: int) -> DriftBand:
 
     if score < 25:
-        return DriftBand(
-            label="improving",
-            min_score=0,
-            max_score=24,
-        )
+        return DriftBand(label="improving", min_score=0, max_score=24)
 
     if score < 45:
-        return DriftBand(
-            label="stable",
-            min_score=25,
-            max_score=44,
-        )
+        return DriftBand(label="stable", min_score=25, max_score=44)
 
     if score < 70:
-        return DriftBand(
-            label="early_drift",
-            min_score=45,
-            max_score=69,
-        )
+        return DriftBand(label="early_drift", min_score=45, max_score=69)
 
-    return DriftBand(
-        label="concerning_drift",
-        min_score=70,
-        max_score=100,
-    )
+    return DriftBand(label="concerning_drift", min_score=70, max_score=100)
 
 
 # --------------------------------------------------
@@ -201,6 +186,7 @@ def _recommendations(band: str):
 # Engine
 # --------------------------------------------------
 
+@register_engine("behavioral_drift")
 def evaluate_behavioral_drift(
     req: CommitmentLockRequest,
 ) -> BehavioralDriftResponse:
@@ -222,7 +208,6 @@ def evaluate_behavioral_drift(
 
     # --------------------------------------------------
     # Placeholder historical baseline
-    # (real system would load user history)
     # --------------------------------------------------
 
     previous_income_share = income_share * 0.9
@@ -259,16 +244,13 @@ def evaluate_behavioral_drift(
 
     drift_score = _clamp(total_change * 200)
 
-
     band = _band(drift_score)
 
     summary = _summary(band.label)
 
     recs = _recommendations(band.label)
 
-
     processing_ms = int((time.perf_counter() - start) * 1000)
-
 
     return BehavioralDriftResponse(
 

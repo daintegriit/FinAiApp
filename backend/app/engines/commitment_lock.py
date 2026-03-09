@@ -7,6 +7,8 @@ import uuid
 from datetime import datetime, UTC
 
 from app.core.config import settings
+from app.engines.engine_registry import register_engine
+
 from app.schemas.commitment_lock import (
     CommitmentLockRequest,
     CommitmentLockResponse,
@@ -197,6 +199,7 @@ def lock_score_and_reasons(
     return clamp_int(score, 0, 100), reasons
 
 
+@register_engine("commitment_lock")
 def evaluate_commitment_lock(req: CommitmentLockRequest) -> CommitmentLockResponse:
 
     start_time = time.perf_counter()
@@ -229,9 +232,17 @@ def evaluate_commitment_lock(req: CommitmentLockRequest) -> CommitmentLockRespon
 
     total_paid = req.monthly_payment * req.term_months
 
-    fv_nominal = future_value_of_annuity(req.monthly_payment, req.term_months, annual_return)
+    fv_nominal = future_value_of_annuity(
+        req.monthly_payment,
+        req.term_months,
+        annual_return,
+    )
 
-    fv_real = inflation_adjust(fv_nominal, req.term_months, annual_inflation)
+    fv_real = inflation_adjust(
+        fv_nominal,
+        req.term_months,
+        annual_inflation,
+    )
 
     net_income: Optional[float] = req.net_monthly_income
 
