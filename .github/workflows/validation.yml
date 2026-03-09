@@ -29,4 +29,4 @@ jobs:
     - name: Run Financial Engine Validation
       run: |
         cd backend
-        PYTHONPATH=$PWD python scripts/run_global_validation.py
+        python -m scripts.run_global_validation
