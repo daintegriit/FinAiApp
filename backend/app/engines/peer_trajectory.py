@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 import random
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Literal
 
 from pydantic import BaseModel, Field
@@ -167,7 +167,7 @@ def evaluate_peer_trajectory(req: CommitmentLockRequest) -> PeerTrajectoryRespon
     start = time.perf_counter()
 
     request_id = str(uuid.uuid4())
-    timestamp = datetime.utcnow()
+    timestamp = datetime.now(UTC)
 
     raw_policy_versions = get_policy_versions()
     policy_versions = dict(raw_policy_versions) if raw_policy_versions else {}

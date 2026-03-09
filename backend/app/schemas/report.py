@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional, List, Literal, Dict, Any
-from datetime import datetime
+from datetime import datetime, UTC
 from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator

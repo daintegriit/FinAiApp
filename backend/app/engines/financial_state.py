@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.engines.commitment_lock import evaluate_commitment_lock
 from app.engines.financial_identity import evaluate_financial_identity
@@ -94,7 +94,7 @@ def evaluate_financial_state(request):
 
     request_id = str(uuid.uuid4())
     policy_versions = get_policy_versions()
-    timestamp = datetime.utcnow()
+    timestamp = datetime.now(UTC)
 
     # --------------------------------------------------
     # Execute Base Engines

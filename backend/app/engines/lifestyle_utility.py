@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
 
@@ -63,7 +63,7 @@ def evaluate_lifestyle_utility(
 
     request_id = str(uuid.uuid4())
 
-    timestamp = datetime.utcnow()
+    timestamp = datetime.now(UTC)
 
     try:
 

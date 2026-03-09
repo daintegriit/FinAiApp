@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional, Dict, Any
 
 from jose import JWTError, jwt
@@ -39,7 +39,7 @@ def create_access_token(
     extra_claims: Optional[Dict[str, Any]] = None
 ) -> str:
 
-    expire = datetime.utcnow() + timedelta(
+    expire = datetime.now(UTC) + timedelta(
         minutes=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
@@ -47,7 +47,7 @@ def create_access_token(
         "sub": subject,
         "type": "access",
         "exp": expire,
-        "iat": datetime.utcnow()
+        "iat": datetime.now(UTC)
     }
 
     if extra_claims:
@@ -66,7 +66,7 @@ def create_access_token(
 
 def create_refresh_token(subject: str) -> str:
 
-    expire = datetime.utcnow() + timedelta(
+    expire = datetime.now(UTC) + timedelta(
         days=REFRESH_TOKEN_EXPIRE_DAYS
     )
 
@@ -74,7 +74,7 @@ def create_refresh_token(subject: str) -> str:
         "sub": subject,
         "type": "refresh",
         "exp": expire,
-        "iat": datetime.utcnow()
+        "iat": datetime.now(UTC)
     }
 
     return jwt.encode(

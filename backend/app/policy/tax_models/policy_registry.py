@@ -11,7 +11,7 @@ through this registry rather than hardcoding them.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Dict
 
 
@@ -71,6 +71,6 @@ def get_registry_metadata() -> Dict[str, str]:
 
         "policy_count": str(len(_POLICY_VERSIONS)),
 
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
 
     }

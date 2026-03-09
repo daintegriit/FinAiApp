@@ -1,7 +1,7 @@
 import requests
 import json
 import os
-from datetime import datetime
+from datetime import datetime, UTC
 
 API_URL = "http://localhost:8080/api/financial/analyze"
 
@@ -132,12 +132,12 @@ def save_results(results):
 
     os.makedirs("validation_runs", exist_ok=True)
 
-    timestamp = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d_%H-%M-%S")
 
     filepath = f"validation_runs/financial_validation_{timestamp}.json"
 
     output = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "tests": results
     }
 

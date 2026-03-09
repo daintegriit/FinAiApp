@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 
 from pydantic import BaseModel
 
@@ -57,7 +57,7 @@ def optimize_payment_level(
 
     request_id = str(uuid.uuid4())
 
-    timestamp = datetime.utcnow()
+    timestamp = datetime.now(UTC)
 
     best_payment = 0
     best_score = 0

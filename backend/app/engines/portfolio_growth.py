@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 import random
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List
 
 from pydantic import BaseModel, Field
@@ -135,7 +135,7 @@ def evaluate_portfolio_growth(
 
     request_id = str(uuid.uuid4())
 
-    timestamp = datetime.utcnow()
+    timestamp = datetime.now(UTC)
 
     results = _simulate_portfolio(
         assumptions.monthly_contribution,

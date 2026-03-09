@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional, Literal
-from datetime import datetime
+from datetime import datetime, UTC
 
 from pydantic import BaseModel, Field, EmailStr
 

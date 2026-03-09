@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Literal
 
 from pydantic import BaseModel, Field
@@ -186,7 +186,7 @@ def evaluate_peer_benchmark(
 
     request_id = str(uuid.uuid4())
 
-    timestamp = datetime.utcnow()
+    timestamp = datetime.now(UTC)
 
     policy_versions = get_policy_versions()
 

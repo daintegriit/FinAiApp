@@ -12,7 +12,7 @@ in the code.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Dict
 
 from app.policy.tax_models.policy_registry import (
@@ -109,7 +109,7 @@ def validate_policy(
 
         "engine_version": ENGINE_VERSION,
 
-        "evaluation_timestamp": datetime.utcnow().isoformat(),
+        "evaluation_timestamp": datetime.now(UTC).isoformat(),
 
         "policy_versions": get_policy_versions(),
 

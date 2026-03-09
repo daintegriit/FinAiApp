@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 
 from pydantic import BaseModel
 
@@ -59,7 +59,7 @@ def compare_scenarios(
 
     request_id = str(uuid.uuid4())
 
-    timestamp = datetime.utcnow()
+    timestamp = datetime.now(UTC)
 
     base_payment = float(req.monthly_payment)
 

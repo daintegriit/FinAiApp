@@ -4,7 +4,7 @@ from typing import Optional, List, Tuple
 import math
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.core.config import settings
 from app.schemas.commitment_lock import (
@@ -205,7 +205,7 @@ def evaluate_commitment_lock(req: CommitmentLockRequest) -> CommitmentLockRespon
 
     policy_versions = get_policy_versions()
 
-    timestamp = datetime.utcnow()
+    timestamp = datetime.now(UTC)
 
     annual_return = (
         req.annual_return_assumption

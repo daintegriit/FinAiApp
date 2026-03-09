@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
@@ -242,7 +242,7 @@ def evaluate_financial_identity(
 
     request_id = str(uuid.uuid4())
 
-    timestamp = datetime.utcnow()
+    timestamp = datetime.now(UTC)
 
     policy_versions = get_policy_versions()
 
