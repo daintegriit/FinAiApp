@@ -119,3 +119,26 @@ portfolio_growth.py    ← REGISTER
 commitment_lock.py     ← REGISTER
 scenario.py            ← REGISTER
 behavioral_drift.py    ← REGISTER
+
+
+
+
+Next
+
+Make the orchestrator fully registry-driven
+
+Then
+
+Update tests so they validate the registry architecture
+
+Then
+
+Lock down which routes are truly part of MVP
+
+Then
+
+Set up migrations / DB bootstrap for when GCP details arrive
+
+Then
+
+Move into frontend/native integration confidently

@@ -1,22 +1,25 @@
 from __future__ import annotations
 
-import time
 import asyncio
+import inspect
 import logging
-from typing import Dict, Any
+import time
+from typing import Any, Dict
 
-from app.engines.policy import validate_policy
-from app.engines.portfolio_growth import (
-    evaluate_portfolio_growth,
-    PortfolioAssumptions,
-)
-from app.engines.commitment_lock import evaluate_commitment_lock
-from app.engines.scenario import evaluate_scenarios
+# Ensure engine decorators run and populate registry
+import app.engines  # noqa: F401
+
+from app.engines.engine_registry import ENGINE_REGISTRY
+from app.engines.portfolio_growth import PortfolioAssumptions
+
 
 logger = logging.getLogger(__name__)
 
 
 class EngineResult:
+    """
+    Standard container for engine execution results.
+    """
 
     def __init__(self, name: str, result: Any, runtime_ms: float):
         self.name = name
@@ -26,29 +29,39 @@ class EngineResult:
 
 class FinancialOrchestrator:
     """
-    Central engine coordinator.
+    Registry-driven financial engine orchestrator.
 
-    Responsible for:
-    • executing financial engines
-    • collecting runtime metrics
-    • isolating failures
-    • returning unified results
+    Responsibilities
+    ----------------
+    • discover engines from ENGINE_REGISTRY
+    • normalize shared request payloads
+    • run engines concurrently
+    • isolate failures
+    • collect runtime metrics
+    • return unified results
     """
 
     def __init__(self):
+        # Snapshot registry at initialization
+        self.engines = dict(ENGINE_REGISTRY)
 
-        self.engines = {
-            "policy": self._run_policy,
-            "portfolio": self._run_portfolio,
-            "commitment": self._run_commitment,
-            "scenarios": self._run_scenarios,
+        # Maintain backward-compatible output keys
+        self.output_aliases = {
+            "policy": "policy",
+            "portfolio": "portfolio",
+            "commitment_lock": "commitment",
+            "scenarios": "scenarios",
+            "behavioral_drift": "behavioral_drift",
         }
 
     # --------------------------------------------------
     # Input Normalization
     # --------------------------------------------------
 
-    def _build_portfolio_assumptions(self, data: Dict[str, Any]) -> PortfolioAssumptions:
+    def _build_portfolio_assumptions(
+        self,
+        data: Dict[str, Any],
+    ) -> PortfolioAssumptions:
 
         return PortfolioAssumptions(
             monthly_contribution=data.get("monthly_contribution", 0),
@@ -58,55 +71,76 @@ class FinancialOrchestrator:
             simulations=data.get("simulations", 500),
         )
 
+    def _build_policy_args(self, data: Dict[str, Any]) -> Dict[str, Any]:
+
+        return {
+            "income": data.get("income"),
+            "expenses": data.get("expenses"),
+            "savings_rate": data.get("savings_rate"),
+        }
+
+    def _build_engine_input(self, engine_name: str, data: Dict[str, Any]) -> Any:
+        """
+        Convert shared orchestrator payload into engine-specific inputs.
+        """
+
+        if engine_name == "policy":
+            return self._build_policy_args(data)
+
+        if engine_name == "portfolio":
+            return self._build_portfolio_assumptions(data)
+
+        if engine_name == "commitment_lock":
+            return data.get("commitment_request", data)
+
+        if engine_name == "scenarios":
+            return data.get("scenarios", [])
+
+        if engine_name == "behavioral_drift":
+            return data.get("commitment_request", data)
+
+        return data
+
+    def _output_name(self, engine_name: str) -> str:
+        return self.output_aliases.get(engine_name, engine_name)
+
     # --------------------------------------------------
-    # Engine Wrappers
+    # Engine Execution
     # --------------------------------------------------
 
-    async def _run_policy(self, data: Dict[str, Any]) -> EngineResult:
+    async def _run_engine(
+        self,
+        name: str,
+        engine: Any,
+        data: Dict[str, Any],
+    ) -> EngineResult:
 
         start = time.perf_counter()
 
-        result = validate_policy(
-            income=data.get("income"),
-            expenses=data.get("expenses"),
-            savings_rate=data.get("savings_rate"),
+        payload = self._build_engine_input(name, data)
+
+        try:
+
+            # Handle engines with different signatures
+            if name == "policy":
+                result = engine(**payload)
+            else:
+                result = engine(payload)
+
+            # Support async engines
+            if inspect.iscoroutine(result):
+                result = await result
+
+        except Exception:
+            raise
+
+        runtime = (time.perf_counter() - start) * 1000
+
+        return EngineResult(
+            name=self._output_name(name),
+            result=result,
+            runtime_ms=runtime,
         )
-
-        runtime = (time.perf_counter() - start) * 1000
-
-        return EngineResult("policy", result, runtime)
-
-    async def _run_portfolio(self, data: Dict[str, Any]) -> EngineResult:
-
-        start = time.perf_counter()
-
-        assumptions = self._build_portfolio_assumptions(data)
-
-        result = evaluate_portfolio_growth(assumptions)
-
-        runtime = (time.perf_counter() - start) * 1000
-
-        return EngineResult("portfolio", result, runtime)
-
-    async def _run_commitment(self, data: Dict[str, Any]) -> EngineResult:
-
-        start = time.perf_counter()
-
-        result = evaluate_commitment_lock(data)
-
-        runtime = (time.perf_counter() - start) * 1000
-
-        return EngineResult("commitment", result, runtime)
-
-    async def _run_scenarios(self, data: Dict[str, Any]) -> EngineResult:
-
-        start = time.perf_counter()
-
-        result = evaluate_scenarios(data.get("scenarios", []))
-
-        runtime = (time.perf_counter() - start) * 1000
-
-        return EngineResult("scenarios", result, runtime)
 
     # --------------------------------------------------
     # Main Orchestration
@@ -116,32 +150,33 @@ class FinancialOrchestrator:
 
         start_total = time.perf_counter()
 
-        # Keep engine names paired with tasks
         tasks = [
-            (name, engine(data))
+            (name, self._run_engine(name, engine, data))
             for name, engine in self.engines.items()
         ]
 
         results = await asyncio.gather(
             *[task for _, task in tasks],
-            return_exceptions=True
+            return_exceptions=True,
         )
 
         engine_outputs: Dict[str, Any] = {}
         engine_timings: Dict[str, float] = {}
 
-        for (name, _), result in zip(tasks, results):
+        for (registered_name, _), result in zip(tasks, results):
+
+            output_name = self._output_name(registered_name)
 
             if isinstance(result, Exception):
 
-                logger.exception("Engine failure")
+                logger.exception("Engine failure: %s", registered_name)
 
-                engine_outputs[name] = {
+                engine_outputs[output_name] = {
                     "status": "failed",
                     "error": str(result),
                 }
 
-                engine_timings[name] = 0.0
+                engine_timings[output_name] = 0.0
                 continue
 
             engine_outputs[result.name] = result.result
@@ -153,4 +188,6 @@ class FinancialOrchestrator:
             "engines": engine_outputs,
             "engine_timings": engine_timings,
             "total_runtime_ms": total_runtime,
+            "engine_count": len(self.engines),
+            "registered_engines": list(self.engines.keys()),
         }
