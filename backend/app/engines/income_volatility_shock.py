@@ -245,6 +245,15 @@ def evaluate_income_volatility(
     band = _band(volatility_score)
 
     confidence = "medium"
+    
+    if req.income_stability == "very_stable":
+        volatility_score = max(0, volatility_score - 15)
+        confidence = "high"
+    elif req.income_stability == "variable":
+        volatility_score = min(100, volatility_score + 10)
+    elif req.income_stability == "unpredictable":
+        volatility_score = min(100, volatility_score + 20)
+        confidence = "low"
 
     summary = _summary(volatility_score, band.label)
 

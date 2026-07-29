@@ -89,9 +89,13 @@ def _normalize_employment(employment_type: Optional[str]) -> str:
     if not employment_type:
         return "w2"
     e = employment_type.strip().lower()
-    if e in ("1099", "self-employed", "self_employed", "contractor", "freelance"):
+    if e in ("full_time", "salary", "employee", "w2"):
+        return "w2"
+    if e in ("part_time",):
+        return "w2"  # treat part-time as w2 for tax purposes
+    if e in ("freelance", "contract", "1099", "self-employed", "self_employed", "contractor"):
         return "self_employed"
-    return "w2"
+    return "w2"  # default to w2 if unrecognized
 
 
 # =========================================================

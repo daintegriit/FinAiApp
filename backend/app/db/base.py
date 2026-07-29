@@ -17,10 +17,26 @@ class Base(DeclarativeBase):
 
 
 # --------------------------------------------------
-# Import Models for Alembic Autogeneration
+# Import Models for Alembic Autogeneration + create_all
 # --------------------------------------------------
-# These imports ensure SQLAlchemy registers the models
-# so Alembic can detect them during migration generation.
+# Every model module is imported here so SQLAlchemy registers all
+# tables on Base.metadata. This enables both Alembic autogenerate and
+# Base.metadata.create_all() to see the complete schema. Using module
+# imports (not named class imports) so this is robust regardless of
+# what each model class is called.
 
-from app.models.financial_analysis_run import FinancialAnalysisRun  # noqa: F401,E402
-from app.models.engine_result import EngineResult  # noqa: F401,E402
+import app.models.user  # noqa: F401,E402
+import app.models.profile  # noqa: F401,E402
+import app.models.financial_profile  # noqa: F401,E402
+import app.models.transactions  # noqa: F401,E402
+import app.models.categories  # noqa: F401,E402
+import app.models.simulation  # noqa: F401,E402
+import app.models.push_token  # noqa: F401,E402
+import app.models.merchant_cache  # noqa: F401,E402
+import app.models.financial_analysis_run  # noqa: F401,E402
+import app.models.engine_result  # noqa: F401,E402
+import app.models.report  # noqa: F401,E402
+import app.models.scenario  # noqa: F401,E402
+import app.models.portfolio  # noqa: F401,E402
+import app.models.peers  # noqa: F401,E402
+import app.models.usage  # noqa: F401,E402

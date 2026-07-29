@@ -1,0 +1,921 @@
+import React, { useEffect } from "react";
+
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+} from "react-native";
+
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+
+import {
+  useNavigation,
+} from "@react-navigation/native";
+
+import {
+  useBottomTabBarHeight,
+} from "@react-navigation/bottom-tabs";
+
+import DashboardHeader
+from "@/src/components/header/DashboardHeader";
+
+import MonthlySummary
+from "@/src/components/dashboard/MonthlySummary";
+
+import CategoryDonut
+from "@/src/components/dashboard/CategoryDonut";
+
+import CategoryBreakdown
+from "@/src/components/dashboard/CategoryBreakdown";
+
+import {
+  getTransactions,
+} from "@/src/services/transactions";
+
+import {
+  getMonthlyAnalytics,
+} from "@/src/services/analytics";
+
+import {
+  analyzeFinancial,
+} from "@/src/services/api";
+
+import {
+  useFinanceStore,
+} from "@/src/store/financeStore";
+
+import {
+  useTheme,
+} from "@/src/theme/ThemeContext";
+
+export default function DashboardScreen() {
+
+  const navigation =
+    useNavigation<any>();
+
+  const { theme } =
+    useTheme();
+
+  const tabBarHeight =
+    useBottomTabBarHeight();
+
+  const insets =
+    useSafeAreaInsets();
+
+  // ==========================================
+  // 🔥 THEME COLORS
+  // ==========================================
+
+  const colors =
+    theme.colors;
+
+  // ==========================================
+  // 🔥 STORE
+  // ==========================================
+
+  const {
+
+    transactions,
+
+    income,
+
+    analysis,
+
+    isAnalyzing,
+
+    analysisError,
+
+    setTransactions,
+
+    setAnalytics,
+
+    setAnalysis,
+
+    setAnalyzing,
+
+    setAnalysisError,
+
+  } = useFinanceStore();
+
+  // ==========================================
+  // 📦 LOAD DATA
+  // ==========================================
+
+  useEffect(() => {
+
+    async function loadData() {
+
+      try {
+
+        const tx =
+          await getTransactions();
+
+        setTransactions(tx);
+
+        const analytics =
+          await getMonthlyAnalytics();
+
+        setAnalytics(analytics);
+
+      } catch (error) {
+
+        console.error(
+          "Dashboard load failed:",
+          error
+        );
+      }
+    }
+
+    loadData();
+
+  }, []);
+
+  // ==========================================
+  // 🧠 AI ENGINE
+  // ==========================================
+
+  useEffect(() => {
+
+    async function runAI() {
+
+      try {
+
+        if (
+          !income ||
+          income <= 0
+        ) {
+
+          setAnalysisError(
+            "Set your income to generate insights"
+          );
+
+          return;
+        }
+
+        if (
+          !transactions.length
+        ) {
+
+          setAnalysisError(
+            "Add transactions to generate insights"
+          );
+
+          return;
+        }
+
+        setAnalyzing(true);
+
+        const totalSpent =
+          transactions.reduce(
+
+            (
+              sum: number,
+              t: any
+            ) =>
+
+              sum +
+              (t.amount || 0),
+
+            0
+          );
+
+        const freeCashflow =
+          income - totalSpent;
+
+        const res =
+          await analyzeFinancial({
+
+            schema_version:
+              "2.0",
+
+            monthly_payment:
+              totalSpent,
+
+            term_months:
+              12,
+
+            currency:
+              "USD",
+
+            region:
+              "US",
+
+            net_monthly_income:
+              income,
+
+            current_free_cashflow:
+              freeCashflow,
+
+            annual_return_assumption:
+              0.07,
+
+            annual_inflation_assumption:
+              0.03,
+
+            purchase_category:
+              "lifestyle",
+
+            decision_horizon_years:
+              5,
+
+            goal_cost:
+              totalSpent * 12,
+
+            goal_monthly_contribution:
+              Math.max(
+                totalSpent * 0.2,
+                50
+              ),
+
+            context: {
+
+              country:
+                "US",
+
+              currency:
+                "USD",
+
+              net_monthly_income:
+                income,
+
+              gross_annual_income:
+                income * 12,
+            },
+
+            client_version:
+              "app",
+
+            request_origin:
+              "frontend",
+          });
+
+        setAnalysis(res);
+
+        setAnalysisError(null);
+
+      } catch (error) {
+
+        console.error(
+          "AI error:",
+          error
+        );
+
+        setAnalysisError(
+          "Failed to compute financial insights"
+        );
+
+      } finally {
+
+        setAnalyzing(false);
+      }
+    }
+
+    runAI();
+
+  }, [
+    transactions,
+    income,
+  ]);
+
+  // ==========================================
+  // 🎨 UI
+  // ==========================================
+
+  return (
+
+    <SafeAreaView
+
+      edges={[
+        "top",
+        "bottom",
+      ]}
+
+      style={{
+
+        flex: 1,
+
+        backgroundColor:
+          colors.background,
+      }}
+    >
+
+      <View
+
+        style={[
+
+          styles.wrapper,
+
+          {
+
+            backgroundColor:
+              colors.background,
+          },
+        ]}
+      >
+
+        <ScrollView
+
+          showsVerticalScrollIndicator={false}
+
+          contentContainerStyle={{
+
+            paddingBottom:
+
+              tabBarHeight +
+
+              insets.bottom +
+
+              120,
+          }}
+        >
+
+          {/* ================================= */}
+          {/* 🔥 HEADER */}
+          {/* ================================= */}
+
+          <View
+            style={styles.topSection}
+          >
+
+            <DashboardHeader />
+
+            {/* ============================= */}
+            {/* 🧠 AI CARD */}
+            {/* ============================= */}
+
+            <View
+
+              style={[
+
+                styles.aiCard,
+
+                {
+
+                  backgroundColor:
+                    colors.card,
+
+                  borderColor:
+                    colors.border,
+
+                  shadowColor:
+                    colors.shadow,
+                },
+              ]}
+            >
+
+              <Text
+
+                style={[
+
+                  styles.aiTitle,
+
+                  {
+
+                    color:
+                      colors.text,
+
+                    fontFamily:
+                      theme.fonts.semibold,
+                  },
+                ]}
+              >
+
+                Financial Intelligence
+
+              </Text>
+
+              {/* ========================= */}
+              {/* 💰 NO INCOME */}
+              {/* ========================= */}
+
+              {income <= 0 ? (
+
+                <>
+
+                  <Text
+
+                    style={{
+
+                      color:
+                        colors.textSecondary,
+
+                      fontFamily:
+                        theme.fonts.primary,
+                    }}
+                  >
+
+                    Set your income to unlock insights
+
+                  </Text>
+
+                  <TouchableOpacity
+
+                    style={[
+
+                      styles.incomeButton,
+
+                      {
+
+                        backgroundColor:
+                          colors.text,
+                      },
+                    ]}
+
+                    onPress={() =>
+                      navigation.navigate(
+                        "income"
+                      )
+                    }
+                  >
+
+                    <Text
+
+                      style={{
+
+                        color:
+                          colors.background,
+
+                        fontFamily:
+                          theme.fonts.semibold,
+                      }}
+                    >
+
+                      Set Income
+
+                    </Text>
+
+                  </TouchableOpacity>
+
+                </>
+
+              ) : !transactions.length ? (
+
+                <Text
+
+                  style={{
+
+                    color:
+                      colors.textSecondary,
+
+                    fontFamily:
+                      theme.fonts.primary,
+                  }}
+                >
+
+                  Add transactions to generate insights
+
+                </Text>
+
+              ) : isAnalyzing ? (
+
+                <ActivityIndicator
+
+                  size="small"
+
+                  color={
+                    colors.text
+                  }
+                />
+
+              ) : analysisError ? (
+
+                <Text
+
+                  style={{
+
+                    color:
+                      colors.danger,
+
+                    fontFamily:
+                      theme.fonts.primary,
+                  }}
+                >
+
+                  {analysisError}
+
+                </Text>
+
+              ) : analysis ? (
+
+                <>
+
+                  <Text
+
+                    style={[
+
+                      styles.aiScore,
+
+                      {
+
+                        color:
+                          colors.text,
+
+                        fontFamily:
+                          theme.fonts.bold,
+                      },
+                    ]}
+                  >
+
+                    {
+                      analysis.global_financial_score
+                    }
+
+                  </Text>
+
+                  <Text
+
+                    style={[
+
+                      styles.aiRisk,
+
+                      {
+
+                        color:
+                          colors.textSecondary,
+
+                        fontFamily:
+                          theme.fonts.medium,
+                      },
+                    ]}
+                  >
+
+                    {
+                      analysis.risk_level?.toUpperCase()
+                    }
+
+                  </Text>
+
+                  <View
+
+                    style={[
+
+                      styles.aiDivider,
+
+                      {
+
+                        backgroundColor:
+                          colors.divider,
+                      },
+                    ]}
+                  />
+
+                  <Text
+
+                    style={[
+
+                      styles.aiSub,
+
+                      {
+
+                        color:
+                          colors.textSecondary,
+
+                        fontFamily:
+                          theme.fonts.primary,
+                      },
+                    ]}
+                  >
+
+                    Cashflow: {
+
+                      analysis.financial_health?.cashflow
+                    }
+
+                  </Text>
+
+                  <Text
+
+                    style={[
+
+                      styles.aiSub,
+
+                      {
+
+                        color:
+                          colors.textSecondary,
+
+                        fontFamily:
+                          theme.fonts.primary,
+                      },
+                    ]}
+                  >
+
+                    Savings Rate: {
+
+                      analysis.financial_health?.savings_rate
+                    }
+
+                  </Text>
+
+                </>
+
+              ) : null}
+
+            </View>
+
+            {/* ============================= */}
+            {/* 📊 SUMMARY */}
+            {/* ============================= */}
+
+            <View
+              style={styles.sectionSmall}
+            >
+
+              <MonthlySummary />
+
+            </View>
+
+            {/* ============================= */}
+            {/* 🍩 DONUT */}
+            {/* ============================= */}
+
+            <View
+              style={styles.sectionLarge}
+            >
+
+              <CategoryDonut compact />
+
+            </View>
+
+          </View>
+
+          {/* ================================= */}
+          {/* 📊 BREAKDOWN */}
+          {/* ================================= */}
+
+          <View
+            style={styles.contentSection}
+          >
+
+            <Text
+
+              style={[
+
+                styles.sectionTitle,
+
+                {
+
+                  color:
+                    colors.text,
+
+                  fontFamily:
+                    theme.fonts.semibold,
+                },
+              ]}
+            >
+
+              Spending Breakdown
+
+            </Text>
+
+            <CategoryBreakdown />
+
+          </View>
+
+        </ScrollView>
+
+        {/* ================================= */}
+        {/* 🚀 FAB */}
+        {/* ================================= */}
+
+        <TouchableOpacity
+
+          style={[
+
+            styles.fab,
+
+            {
+
+              backgroundColor:
+                colors.text,
+
+              bottom:
+
+                tabBarHeight +
+
+                insets.bottom +
+
+                18,
+            },
+          ]}
+
+          onPress={() =>
+            navigation.navigate(
+              "add"
+            )
+          }
+        >
+
+          <Text
+
+            style={{
+
+              color:
+                colors.background,
+
+              fontSize: 30,
+
+              marginTop: -2,
+
+              fontFamily:
+                theme.fonts.medium,
+            }}
+          >
+
+            +
+
+          </Text>
+
+        </TouchableOpacity>
+
+      </View>
+
+    </SafeAreaView>
+  );
+}
+
+const styles =
+  StyleSheet.create({
+
+    wrapper: {
+
+      flex: 1,
+    },
+
+    topSection: {
+
+      paddingHorizontal: 16,
+    },
+
+    contentSection: {
+
+      marginTop: 20,
+
+      paddingHorizontal: 16,
+    },
+
+    sectionSmall: {
+
+      marginTop: 14,
+    },
+
+    sectionLarge: {
+
+      marginTop: 28,
+
+      alignItems: "center",
+    },
+
+    sectionTitle: {
+
+      fontSize: 16,
+
+      marginBottom: 14,
+
+      letterSpacing: 1.2,
+    },
+
+    // ======================================
+    // 🧠 AI CARD
+    // ======================================
+
+    aiCard: {
+
+      marginTop: 16,
+
+      padding: 20,
+
+      borderRadius: 22,
+
+      borderWidth: 1,
+
+      shadowOpacity: 0.06,
+
+      shadowRadius: 16,
+
+      shadowOffset: {
+
+        width: 0,
+        height: 6,
+      },
+
+      elevation: 3,
+    },
+
+    aiTitle: {
+
+      fontSize: 14,
+
+      marginBottom: 8,
+
+      letterSpacing: 0.4,
+    },
+
+    aiScore: {
+
+      fontSize: 34,
+    },
+
+    aiRisk: {
+
+      fontSize: 13,
+
+      marginTop: 4,
+
+      letterSpacing: 1,
+    },
+
+    aiDivider: {
+
+      height: 1,
+
+      marginVertical: 12,
+
+      opacity: 0.5,
+    },
+
+    aiSub: {
+
+      fontSize: 13,
+
+      marginTop: 5,
+    },
+
+    incomeButton: {
+
+      marginTop: 14,
+
+      paddingVertical: 12,
+
+      borderRadius: 14,
+
+      alignItems: "center",
+    },
+
+    // ======================================
+    // 🚀 FAB
+    // ======================================
+
+    fab: {
+
+      position: "absolute",
+
+      alignSelf: "center",
+
+      width: 68,
+
+      height: 68,
+
+      borderRadius: 34,
+
+      justifyContent: "center",
+
+      alignItems: "center",
+
+      shadowOpacity: 0.16,
+
+      shadowRadius: 18,
+
+      shadowOffset: {
+
+        width: 0,
+        height: 8,
+      },
+
+      elevation: 10,
+    },
+  });
+
+
+
+
+
+
+
+
+
+
+
+  darrylcarp@Mac FinAiAPP % grep -n "gcloud run deploy\|set-env-vars\|env-vars-file\|add-cloudsql\|\\\\$" backend/deploy.sh
+4:docker buildx build --no-cache --platform linux/amd64 \
+5:  -t us-central1-docker.pkg.dev/finaibudgetingapp/finai/backend:latest \
+8:gcloud run deploy finai-backend \
+9:  --image us-central1-docker.pkg.dev/finaibudgetingapp/finai/backend:latest \
+10:  --platform managed \
+11:  --region us-east1 \
+12:  --allow-unauthenticated \
+13:  --port 8080 \
+14:  --memory 1Gi \
+15:  --cpu 1 \
+16:  --min-instances 1 \
+17:  --max-instances 20 \
+18:  --concurrency 80 \
+19:  --project finaibudgetingapp \
+20:  --set-env-vars "DATABASE_URL=postgresql+psycopg2://finai_user:@34.138.131.3:5432/finai_db,JWT_SECRET_KEY=CHANGE_ME_SECRET,ENV=production,DEBUG=False,RESEND_API_KEY=,FROM_EMAIL=support@finbudgetai.com,GOOGLE_IOS_CLIENT_ID=466323878357-l7a3rcma7e4dfeesk86fo0vghojetpd5.apps.googleusercontent.com,GOOGLE_WEB_CLIENT_ID=466323878357-nr7s0ghh9bimc760b2dqhvsq5ta14bo9.apps.googleusercontent.com,APPLE_BUNDLE_ID=com.finbudgetai.app,ANTHROPIC_API_KEY="
+darrylcarp@Mac FinAiAPP % 

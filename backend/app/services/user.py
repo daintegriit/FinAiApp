@@ -13,7 +13,6 @@ from app.auth.password_utils import hash_password
 # --------------------------------------------------
 
 def get_user_by_email(db: Session, email: str) -> User | None:
-
     return db.query(User).filter(User.email == email).first()
 
 
@@ -22,7 +21,6 @@ def get_user_by_email(db: Session, email: str) -> User | None:
 # --------------------------------------------------
 
 def get_user_by_id(db: Session, user_id: str) -> User | None:
-
     return db.query(User).filter(User.user_id == user_id).first()
 
 
@@ -42,7 +40,7 @@ def create_user(db: Session, payload: UserCreateRequest) -> User:
 
     user = User(
         email=payload.email,
-        password_hash=hash_password(payload.password),
+        password_hash=hash_password(payload.password[:72]),
         role=payload.role,
         status="active",
     )
@@ -68,7 +66,9 @@ def update_user(
         user.email = payload.email
 
     if payload.password is not None:
-        user.password_hash = hash_password(payload.password)
+        user.password_hash = hash_password(
+            payload.password[:72]
+        )
 
     if payload.role is not None:
         user.role = payload.role
@@ -101,14 +101,20 @@ def delete_user(db: Session, user: User) -> User:
 # --------------------------------------------------
 
 def get_user(db: Session, user_id: str) -> User | None:
+    return db.query(User).filter(
+        User.user_id == user_id
+    ).first()
 
-    return db.query(User).filter(User.user_id == user_id).first()
 
 # --------------------------------------------------
 # List Users
 # --------------------------------------------------
 
-def list_users(db: Session, limit: int = 50, offset: int = 0) -> list[User]:
+def list_users(
+    db: Session,
+    limit: int = 50,
+    offset: int = 0
+) -> list[User]:
 
     return (
         db.query(User)

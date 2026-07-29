@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=False
+        case_sensitive=False,
+        extra="ignore",
     )
 
     # --------------------------------------------------
@@ -31,6 +32,13 @@ class Settings(BaseSettings):
 
     HOST: str = "0.0.0.0"
     PORT: int = 8080
+
+    # --------------------------------------------------
+    # Financial Defaults (REQUIRED BY ENGINES)
+    # --------------------------------------------------
+
+    DEFAULT_ANNUAL_RETURN: float = 0.07
+    DEFAULT_ANNUAL_INFLATION: float = 0.02
 
     # --------------------------------------------------
     # Database

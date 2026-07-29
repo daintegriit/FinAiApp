@@ -48,40 +48,71 @@ def _safe_engine_run(engine_fn, request):
 
 
 # --------------------------------------------------
-# Score Fusion
+# Score Fusion Config
 # --------------------------------------------------
 
+HEALTH_ORIENTED_FIELDS = [
+    ("peer_benchmark", "peer_score"),
+    ("global_impact", "impact_score"),
+    ("financial_resilience", "resilience_score"),
+]
+
+RISK_ORIENTED_FIELDS = [
+    ("commitment_lock", "lock_score"),
+    ("income_volatility", "volatility_score"),
+    ("macro_sensitivity", "macro_sensitivity_score"),
+    ("behavioral_drift", "drift_score"),
+]
+
 def _extract_score(obj, field):
+
     if isinstance(obj, dict):
         return obj.get(field)
+
     return getattr(obj, field, None)
+
+def _normalize_score(value, *, higher_is_better: bool) -> float | None:
+    if value is None:
+        return None
+
+    try:
+        score = float(value)
+    except Exception:
+        return None
+
+    score = max(0.0, min(100.0, score))
+
+    if higher_is_better:
+        return score
+
+    return 100.0 - score
 
 
 def _compute_global_scores(results):
 
-    scores = []
+    normalized_scores = []
 
-    fields = [
-        ("commitment_lock", "lock_score"),
-        ("income_volatility", "volatility_score"),
-        ("macro_sensitivity", "macro_sensitivity_score"),
-        ("peer_benchmark", "peer_score"),
-        ("global_impact", "impact_score"),
-        ("financial_resilience", "resilience_score"),
-        ("behavioral_drift", "drift_score"),
-    ]
-
-    for engine, field in fields:
-
+    for engine, field in HEALTH_ORIENTED_FIELDS:
         value = _extract_score(results.get(engine), field)
+        score = _normalize_score(value, higher_is_better=True)
 
-        if value is not None:
-            scores.append(value)
+        if score is not None:
+            normalized_scores.append(score)
 
-    if not scores:
+    for engine, field in RISK_ORIENTED_FIELDS:
+        value = _extract_score(results.get(engine), field)
+        score = _normalize_score(value, higher_is_better=False)
+
+        if score is not None:
+            normalized_scores.append(score)
+
+    if not normalized_scores:
         return None
 
-    return round(sum(scores) / len(scores), 2)
+    return round(
+        sum(normalized_scores) / len(normalized_scores),
+        2,
+    )
 
 
 # --------------------------------------------------

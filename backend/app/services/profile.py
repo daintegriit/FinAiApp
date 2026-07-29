@@ -8,25 +8,15 @@ from app.schemas.profile import (
     ProfileCreateRequest,
     ProfileUpdateRequest,
 )
-from app.models.user import User
 
-
-# --------------------------------------------------
-# Get Profile
-# --------------------------------------------------
 
 def get_profile(db: Session, user_id: str) -> Profile | None:
-
     return (
         db.query(Profile)
         .filter(Profile.user_id == user_id)
         .first()
     )
 
-
-# --------------------------------------------------
-# Create Profile
-# --------------------------------------------------
 
 def create_profile(
     db: Session,
@@ -51,6 +41,17 @@ def create_profile(
         monthly_income=payload.monthly_income,
         risk_tolerance=payload.risk_tolerance,
         investment_experience=payload.investment_experience,
+        financial_goal=payload.financial_goal,
+        lifestyle=payload.lifestyle,
+        income_stability=payload.income_stability,
+        savings_amount=payload.savings_amount,
+        debt_amount=payload.debt_amount,
+        emergency_fund_months=payload.emergency_fund_months,
+        city=payload.city,
+        state=payload.state,
+        zip_code=payload.zip_code,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
     )
 
     db.add(profile)
@@ -60,39 +61,25 @@ def create_profile(
     return profile
 
 
-# --------------------------------------------------
-# Update Profile
-# --------------------------------------------------
-
 def update_profile(
     db: Session,
     profile: Profile,
     payload: ProfileUpdateRequest
 ) -> Profile:
 
-    if payload.email is not None:
-        profile.email = payload.email
+    fields = [
+        "email", "country", "timezone", "age",
+        "employment_type", "monthly_income",
+        "risk_tolerance", "investment_experience",
+        "financial_goal", "lifestyle", "income_stability",
+        "savings_amount", "debt_amount", "emergency_fund_months",
+        "city", "state", "zip_code", "latitude", "longitude"
+    ]
 
-    if payload.country is not None:
-        profile.country = payload.country
-
-    if payload.timezone is not None:
-        profile.timezone = payload.timezone
-
-    if payload.age is not None:
-        profile.age = payload.age
-
-    if payload.employment_type is not None:
-        profile.employment_type = payload.employment_type
-
-    if payload.monthly_income is not None:
-        profile.monthly_income = payload.monthly_income
-
-    if payload.risk_tolerance is not None:
-        profile.risk_tolerance = payload.risk_tolerance
-
-    if payload.investment_experience is not None:
-        profile.investment_experience = payload.investment_experience
+    for field in fields:
+        val = getattr(payload, field, None)
+        if val is not None:
+            setattr(profile, field, val)
 
     db.commit()
     db.refresh(profile)
@@ -100,11 +87,6 @@ def update_profile(
     return profile
 
 
-# --------------------------------------------------
-# Delete Profile
-# --------------------------------------------------
-
 def delete_profile(db: Session, profile: Profile) -> None:
-
     db.delete(profile)
     db.commit()

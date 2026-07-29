@@ -93,13 +93,13 @@ def evaluate_lifestyle_utility(
             lifestyle_preference = 25
 
 
-        if lifestyle_priority == "family":
+        if lifestyle_priority in ("balanced", "comfortable"):
             housing_stability += 10
 
-        if lifestyle_priority == "mobility":
+        if lifestyle_priority == "comfortable":
             location_quality += 10
 
-        if lifestyle_priority == "personal":
+        if lifestyle_priority == "minimalist":
             lifestyle_preference += 10
 
 

@@ -1,64 +1,51 @@
 from __future__ import annotations
 
 from typing import Optional, Literal
-from datetime import datetime, UTC
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field, EmailStr, field_validator
 import pycountry
 
 
-# --------------------------------------------------
-# ISO Country Validation
-# --------------------------------------------------
-
 def validate_country(code: str) -> str:
-
     code = code.upper()
-
     country = pycountry.countries.get(alpha_2=code)
-
     if country is None:
         raise ValueError(f"Invalid ISO country code: {code}")
-
     return code
 
 
-# --------------------------------------------------
-# Base Profile Schema
-# --------------------------------------------------
-
 class ProfileBase(BaseModel):
 
-    # Identity
     user_id: Optional[str] = None
     email: Optional[EmailStr] = None
 
-    # Location context
     country: str = Field(default="US", min_length=2, max_length=2)
     timezone: Optional[str] = Field(default="UTC")
 
-    # Demographics
-    age: Optional[int] = Field(None, ge=18, le=100)
+    age: Optional[int] = Field(None, ge=13, le=120)
 
     employment_type: Optional[
         Literal[
-            "salary",
+            "full_time",
+            "part_time",
             "self_employed",
+            "freelance",
             "contract",
             "student",
-            "retired"
+            "retired",
+            "unemployed",
         ]
     ] = None
 
-    # Financial context
-    monthly_income: Optional[Decimal] = Field(None, gt=0)
+    monthly_income: Optional[Decimal] = Field(None, ge=0)
 
     risk_tolerance: Optional[
         Literal[
             "conservative",
             "moderate",
-            "aggressive"
+            "aggressive",
         ]
     ] = None
 
@@ -66,46 +53,67 @@ class ProfileBase(BaseModel):
         Literal[
             "beginner",
             "intermediate",
-            "advanced"
+            "advanced",
+            "expert",
         ]
     ] = None
 
-    # Validators
+    # New financial profile fields
+    financial_goal: Optional[
+        Literal[
+            "emergency_fund",
+            "pay_off_debt",
+            "save_for_home",
+            "grow_investments",
+            "retirement",
+        ]
+    ] = None
+
+    lifestyle: Optional[
+        Literal[
+            "minimalist",
+            "balanced",
+            "comfortable",
+        ]
+    ] = None
+
+    income_stability: Optional[
+        Literal[
+            "very_stable",
+            "stable",
+            "variable",
+            "unpredictable",
+        ]
+    ] = None
+
+    savings_amount: Optional[Decimal] = Field(None, ge=0)
+    debt_amount: Optional[Decimal] = Field(None, ge=0)
+    emergency_fund_months: Optional[int] = Field(None, ge=0, le=36)
+
+    # Location (for peer benchmarking)
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[str] = Field(None, max_length=10)
+    latitude: Optional[Decimal] = Field(None, ge=-90, le=90)
+    longitude: Optional[Decimal] = Field(None, ge=-180, le=180)
+
     @field_validator("country")
     @classmethod
     def validate_country_code(cls, v: str) -> str:
         return validate_country(v)
 
 
-# --------------------------------------------------
-# Profile Create
-# --------------------------------------------------
-
 class ProfileCreateRequest(ProfileBase):
     pass
 
-
-# --------------------------------------------------
-# Profile Update
-# --------------------------------------------------
 
 class ProfileUpdateRequest(ProfileBase):
     pass
 
 
-# --------------------------------------------------
-# Profile Response
-# --------------------------------------------------
+class ProfileResponse(BaseModel):
+    status: str
+    processing_ms: float
+    profile: Optional[dict] = None
 
-class ProfileResponse(ProfileBase):
-
-    schema_version: str = "2.0"
-
-    profile_id: Optional[str] = None
-
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-
-    profile_completeness: Optional[Decimal] = None
-
-    model_config = {"frozen": True}
+    model_config = {"from_attributes": True}

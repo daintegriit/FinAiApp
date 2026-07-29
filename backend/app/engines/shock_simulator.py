@@ -240,12 +240,15 @@ def evaluate_shock_simulator(
 
     commitment = evaluate_commitment_lock(req)
 
-    income = float(req.net_monthly_income)
+    income = float(req.net_monthly_income or 4000)
 
     monthly_commitment = float(req.monthly_payment)
 
-    free_cashflow = float(req.current_free_cashflow)
-
+    free_cashflow = float(
+        req.current_free_cashflow or
+        req.savings_buffer or
+        500
+    )
     scenarios_def = [
         ("mild_income_drop", 0.1, 6),
         ("moderate_income_drop", 0.25, 6),

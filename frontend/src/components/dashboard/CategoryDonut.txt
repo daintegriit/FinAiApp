@@ -1,0 +1,1407 @@
+// =====================================================
+// 💎 FINAI — CATEGORY DONUT
+// =====================================================
+
+import React, {
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+} from "react-native";
+
+import Svg, {
+  G,
+  Circle,
+} from "react-native-svg";
+
+import {
+  useFinanceStore,
+  DEFAULT_CATEGORIES,
+} from "../../../src/store/financeStore";
+
+import {
+  useTheme,
+} from "../../../src/theme/ThemeContext";
+
+/* =====================================================
+   TYPES
+===================================================== */
+
+type Mode =
+  | "budget"
+  | "spending";
+
+type Props = {
+  compact?: boolean;
+  mode?: Mode;
+};
+
+type CategoryLike = {
+  name?: string;
+  budget?: number;
+};
+
+type TransactionLike = {
+  category?: string;
+  amount?: number;
+};
+
+interface DonutItem {
+  name: string;
+  value: number;
+  realValue: number;
+  percentage: number;
+  color: string;
+  hasSpending: boolean;
+  budget: number;
+  usagePercentage: number;
+}
+
+/* =====================================================
+   HELPERS
+===================================================== */
+
+function normalize(
+  value?: string
+): string {
+
+  return String(
+    value || "other"
+  )
+    .trim()
+    .toLowerCase();
+}
+
+function safeNumber(
+  value: unknown
+): number {
+
+  const parsed =
+    Number(value);
+
+  return Number.isFinite(parsed)
+    ? parsed
+    : 0;
+}
+
+/* =====================================================
+   COMPONENT
+===================================================== */
+
+export default function CategoryDonut({
+
+  compact = false,
+
+  mode = "budget",
+
+}: Props) {
+
+  const { theme } =
+    useTheme();
+
+  const [
+    selectedSegment,
+    setSelectedSegment,
+  ] = useState<DonutItem | null>(
+    null
+  );
+
+  /* ===================================================
+     STORE
+  =================================================== */
+
+  const transactions =
+    useFinanceStore(
+      (s) => s.transactions
+    );
+
+  const userCategories =
+    useFinanceStore(
+      (s) => s.userCategoryGrid
+    );
+
+  const income =
+    useFinanceStore(
+      (s) => s.income
+    );
+
+  /* ===================================================
+     SAFE VALUES
+  =================================================== */
+
+  const safeTransactions =
+    useMemo<TransactionLike[]>(
+
+      () =>
+
+        Array.isArray(
+          transactions
+        )
+
+          ? transactions
+
+          : [],
+
+      [transactions]
+    );
+
+  const safeCategories =
+    useMemo<CategoryLike[]>(
+
+      () =>
+
+        Array.isArray(
+          userCategories
+        )
+
+          ? userCategories
+
+          : [],
+
+      [userCategories]
+    );
+
+  const safeIncome =
+    safeNumber(income);
+
+  /* ===================================================
+     SPENDING MAP
+  =================================================== */
+
+  const spendingMap =
+    useMemo(() => {
+
+      return safeTransactions.reduce(
+
+        (
+          acc: Record<
+            string,
+            number
+          >,
+
+          tx:
+            TransactionLike
+        ) => {
+
+          const key =
+            normalize(
+              tx?.category
+            );
+
+          const amount =
+            Math.abs(
+              safeNumber(
+                tx?.amount
+              )
+            );
+
+          acc[key] =
+            (acc[key] || 0) +
+            amount;
+
+          return acc;
+
+        },
+
+        {}
+      );
+
+    }, [safeTransactions]);
+
+  /* ===================================================
+     CATEGORY SYSTEM
+  =================================================== */
+
+  const allCategories =
+    useMemo(() => {
+
+      const merged = [
+        ...DEFAULT_CATEGORIES,
+        ...safeCategories,
+      ];
+
+      const map = new Map();
+
+      merged.forEach((cat: any) => {
+
+        const normalized =
+          normalize(cat.name);
+
+        const spent =
+          safeNumber(
+            spendingMap[
+              normalized
+            ]
+          );
+
+        map.set(normalized, {
+
+          ...cat,
+
+          budget:
+            safeNumber(
+              cat?.budget
+            ),
+
+          spent,
+        });
+      });
+
+      return Array.from(
+        map.values()
+      );
+
+    }, [
+      safeCategories,
+      spendingMap,
+    ]);
+
+  /* ===================================================
+     DATA
+  =================================================== */
+
+  const data =
+    useMemo<
+      DonutItem[]
+    >(() => {
+
+      const raw =
+        allCategories.map(
+
+          (
+            cat,
+            index
+          ) => {
+
+            const key =
+              normalize(
+                cat?.name
+              );
+
+            const value =
+              safeNumber(
+                spendingMap[
+                  key
+                ]
+              );
+
+            const budget =
+              safeNumber(
+                cat?.budget
+              );
+
+            const hasSpending =
+              value > 0;
+
+            const usagePercentage =
+              budget > 0
+                ? (value / budget) * 100
+                : 0;
+
+            return {
+
+              name:
+                cat?.name ||
+                "Other",
+
+              value:
+                hasSpending
+                  ? value
+                  : 0,
+
+              realValue:
+                value,
+
+              budget,
+
+              usagePercentage,
+
+              percentage: 0,
+
+              color:
+                getCategoryColor(
+                  cat,
+                  value,
+                  theme,
+                  mode,
+                  index
+                ),
+
+              hasSpending,
+            };
+          }
+        );
+
+      /* ===============================================
+         TOTAL BUDGET
+      =============================================== */
+
+      const totalBudget =
+        raw.reduce(
+
+          (
+            sum,
+            item
+          ) =>
+
+            sum +
+            safeNumber(
+              item.budget
+            ),
+
+          0
+        );
+
+      return raw
+        .map((item) => ({
+
+          ...item,
+
+          percentage:
+
+            totalBudget > 0
+
+              ? (
+                  safeNumber(
+                    item.budget
+                  ) /
+                  totalBudget
+                ) * 100
+
+              : 0,
+        }))
+        .filter(
+          (item) =>
+
+            item.realValue > 0 ||
+            item.budget > 0
+        );
+
+    }, [
+      allCategories,
+      spendingMap,
+      theme,
+      mode,
+    ]);
+
+  /* ===================================================
+     TOTALS
+  =================================================== */
+
+  const totalSpending =
+    useMemo(
+
+      () =>
+
+        data.reduce(
+
+          (
+            sum,
+            item
+          ) =>
+
+            sum +
+            item.realValue,
+
+          0
+        ),
+
+      [data]
+    );
+
+  const remaining =
+    safeIncome -
+    totalSpending;
+
+  const remainingPercent =
+
+    safeIncome > 0
+
+      ? Math.max(
+          0,
+
+          Math.round(
+            (remaining /
+              safeIncome) *
+              100
+          )
+        )
+
+      : 0;
+
+  /* ===================================================
+     EMPTY STATE
+  =================================================== */
+
+  if (
+    !data.length
+  ) {
+
+    return (
+
+      <View
+        style={[
+          styles.emptyContainer,
+          {
+            borderColor:
+              theme.colors
+                .divider,
+
+            backgroundColor:
+              theme.colors
+                .background,
+          },
+        ]}
+      >
+
+        <Text
+          style={[
+            styles.emptyText,
+            {
+              color:
+                theme.colors
+                  .textSecondary,
+
+              fontFamily:
+                theme.fonts
+                  .primary,
+            },
+          ]}
+        >
+
+          No category data available
+
+        </Text>
+
+      </View>
+    );
+  }
+
+  /* ===================================================
+     SIZING
+  =================================================== */
+
+  const size =
+    compact
+      ? 190
+      : 300;
+
+  const strokeWidth =
+    compact
+      ? 18
+      : 24;
+
+  const radius =
+    compact
+      ? 72
+      : 112;
+
+  const center =
+    size / 2;
+
+  const circumference =
+    2 *
+    Math.PI *
+    radius;
+
+  /* ===================================================
+     SEGMENTS
+  =================================================== */
+
+  let cumulative = 0;
+
+  const segments =
+    data.map(
+      (
+        item,
+        index
+      ) => {
+
+        const percentage =
+          item.percentage / 100;
+
+        const gapSize = 8;
+
+        const dashLength =
+          Math.max(
+            0,
+            circumference *
+              percentage -
+              gapSize
+          );
+
+        const gapLength =
+          circumference -
+          dashLength;
+
+        const rotation =
+          cumulative *
+          360;
+
+        cumulative +=
+          percentage;
+
+        return {
+
+          key:
+            `${item.name}-${index}`,
+
+          color:
+            item.color,
+
+          strokeDasharray: `
+            ${dashLength}
+            ${gapLength}
+          `,
+
+          rotation,
+
+          item,
+        };
+      }
+    );
+
+  /* ===================================================
+     REMAINING COLOR
+  =================================================== */
+
+  const remainingColor =
+
+    remaining < 0
+
+      ? theme.colors
+          .danger
+
+      : remaining <
+        safeIncome * 0.2
+
+      ? theme.colors
+          .warning
+
+      : theme.colors
+          .success;
+
+  /* ===================================================
+     UI
+  =================================================== */
+
+  return (
+
+    <View
+      style={
+        styles.wrapper
+      }
+    >
+
+      {/* ============================================= */}
+      {/* TOOLTIP */}
+      {/* ============================================= */}
+
+      {selectedSegment && (
+
+        <Pressable
+          style={[
+            styles.segmentTooltip,
+
+            {
+              backgroundColor:
+                theme.colors.card,
+
+              borderColor:
+                theme.colors.border,
+            },
+          ]}
+          onPress={() =>
+            setSelectedSegment(null)
+          }
+        >
+
+          <View
+            style={[
+              styles.segmentTooltipDot,
+
+              {
+                backgroundColor:
+                  selectedSegment.color,
+              },
+            ]}
+          />
+
+          <Text
+            style={[
+              styles.segmentTooltipTitle,
+
+              {
+                color:
+                  theme.colors.text,
+
+                fontFamily:
+                  theme.fonts.semibold,
+              },
+            ]}
+          >
+            {selectedSegment.name}
+          </Text>
+
+          <Text
+            style={[
+              styles.segmentTooltipText,
+
+              {
+                color:
+                  theme.colors.textSecondary,
+              },
+            ]}
+          >
+            ${Math.round(
+              selectedSegment.realValue
+            )} spent
+          </Text>
+
+          <Text
+            style={[
+              styles.segmentTooltipText,
+
+              {
+                color:
+                  theme.colors.textSecondary,
+              },
+            ]}
+          >
+            ${Math.round(
+              selectedSegment.budget
+            )} budget
+          </Text>
+
+          <Text
+            style={[
+              styles.segmentTooltipText,
+
+              {
+                color:
+                  selectedSegment.color,
+
+                fontFamily:
+                  theme.fonts.semibold,
+              },
+            ]}
+          >
+            {Math.round(
+              selectedSegment.usagePercentage
+            )}% used
+          </Text>
+
+        </Pressable>
+      )}
+
+      {/* ============================================= */}
+      {/* DONUT */}
+      {/* ============================================= */}
+
+      <View
+        style={[
+          styles.container,
+          {
+            width: size,
+            height: size,
+          },
+        ]}
+      >
+
+        <Svg
+          width={size}
+          height={size}
+        >
+
+          {/* BASE TRACK */}
+
+          <Circle
+            cx={center}
+            cy={center}
+            r={radius}
+            stroke={
+              theme.colors
+                .divider
+            }
+            strokeWidth={
+              strokeWidth
+            }
+            fill="transparent"
+          />
+
+          {/* SEGMENTS */}
+
+          {segments.map(
+            (
+              segment
+            ) => (
+
+              <G
+                key={
+                  segment.key
+                }
+                rotation={
+                  segment.rotation -
+                  90
+                }
+                origin={`${center}, ${center}`}
+              >
+
+                {/* HITBOX */}
+
+                <Circle
+                  cx={center}
+                  cy={center}
+                  r={radius}
+                  stroke="transparent"
+                  strokeWidth={
+                    strokeWidth + 28
+                  }
+                  fill="transparent"
+                  strokeDasharray={
+                    segment.strokeDasharray
+                  }
+                  strokeLinecap="round"
+                  onPress={() => {
+
+                    setSelectedSegment(
+                      segment.item
+                    );
+                  }}
+                />
+
+                {/* OUTLINE */}
+
+                <Circle
+                  cx={center}
+                  cy={center}
+                  r={radius}
+                  stroke={
+                    theme.colors
+                      .background
+                  }
+                  strokeWidth={
+                    strokeWidth + 6
+                  }
+                  fill="transparent"
+                  strokeDasharray={
+                    segment.strokeDasharray
+                  }
+                  strokeLinecap="round"
+                />
+
+                {/* MAIN */}
+
+                <Circle
+                  cx={center}
+                  cy={center}
+                  r={radius}
+                  stroke={
+                    segment.color
+                  }
+                  strokeWidth={
+                    strokeWidth
+                  }
+                  fill="transparent"
+                  strokeDasharray={
+                    segment.strokeDasharray
+                  }
+                  strokeLinecap="round"
+                  onPress={() => {
+
+                    setSelectedSegment(
+                      segment.item
+                    );
+                  }}
+                />
+
+              </G>
+            )
+          )}
+
+        </Svg>
+
+        {/* CENTER */}
+
+        <View
+          pointerEvents="none"
+          style={
+            styles.centerContent
+          }
+        >
+
+          <Text
+            style={[
+              styles.remainingValue,
+              {
+                color:
+                  remainingColor,
+
+                fontSize:
+                  compact
+                    ? 30
+                    : 54,
+
+                lineHeight:
+                  compact
+                    ? 34
+                    : 60,
+
+                fontFamily:
+                  theme.fonts
+                    .accent2,
+              },
+            ]}
+          >
+
+            {remaining < 0
+
+              ? `-$${Math.abs(
+                  Math.round(
+                    remaining
+                  )
+                ).toLocaleString()}`
+
+              : `$${Math.round(
+                  remaining
+                ).toLocaleString()}`}
+
+          </Text>
+
+          <Text
+            style={[
+              styles.remainingLabel,
+              {
+                color:
+                  theme.colors
+                    .textSecondary,
+
+                fontSize:
+                  compact
+                    ? 13
+                    : 18,
+
+                fontFamily:
+                  theme.fonts
+                    .accent,
+              },
+            ]}
+          >
+
+            {remainingPercent}% LEFT
+
+          </Text>
+
+        </View>
+
+      </View>
+
+      {/* ============================================= */}
+      {/* LEGEND */}
+      {/* ============================================= */}
+
+      <View
+        style={
+          styles.legendContainer
+        }
+      >
+
+        {data
+          .sort(
+            (a, b) =>
+              b.budget -
+              a.budget
+          )
+          .slice(0, 6)
+          .map((item) => (
+
+            <Pressable
+              key={item.name}
+              style={
+                styles.legendRow
+              }
+              onPress={() =>
+                setSelectedSegment(
+                  item
+                )
+              }
+            >
+
+              <View
+                style={[
+                  styles.legendDot,
+                  {
+                    backgroundColor:
+                      item.color,
+                  },
+                ]}
+              />
+
+              <Text
+                style={[
+                  styles.legendText,
+                  {
+                    color:
+                      theme.colors
+                        .text,
+
+                    fontFamily:
+                      theme.fonts
+                        .primary,
+                  },
+                ]}
+              >
+
+                {item.name}
+                {" "}
+                (
+                {Math.round(
+                  item.usagePercentage
+                )}
+                % used)
+
+              </Text>
+
+            </Pressable>
+          ))}
+
+      </View>
+
+      {/* ============================================= */}
+      {/* EXPLAINER */}
+      {/* ============================================= */}
+
+      <View
+        style={[
+          styles.tooltipContainer,
+          {
+            backgroundColor:
+              theme.colors.surface,
+
+            borderColor:
+              theme.colors.border,
+          },
+        ]}
+      >
+
+        <Text
+          style={[
+            styles.tooltipTitle,
+            {
+              color:
+                theme.colors.text,
+
+              fontFamily:
+                theme.fonts.semibold,
+            },
+          ]}
+        >
+          Budget Allocation Ring
+        </Text>
+
+        <Text
+          style={[
+            styles.tooltipText,
+            {
+              color:
+                theme.colors.textSecondary,
+            },
+          ]}
+        >
+          Slice size = category budget allocation.
+        </Text>
+
+        <Text
+          style={[
+            styles.tooltipText,
+            {
+              color:
+                theme.colors.textSecondary,
+            },
+          ]}
+        >
+          Slice color = budget health.
+        </Text>
+
+        <View style={styles.tooltipLegendRow}>
+
+          <View
+            style={[
+              styles.tooltipDot,
+              {
+                backgroundColor:
+                  theme.colors.success,
+              },
+            ]}
+          />
+
+          <Text
+            style={styles.tooltipMiniText}
+          >
+            Healthy
+          </Text>
+
+          <View
+            style={[
+              styles.tooltipDot,
+              {
+                backgroundColor:
+                  theme.colors.warning,
+              },
+            ]}
+          />
+
+          <Text
+            style={styles.tooltipMiniText}
+          >
+            Near Limit
+          </Text>
+
+          <View
+            style={[
+              styles.tooltipDot,
+              {
+                backgroundColor:
+                  theme.colors.danger,
+              },
+            ]}
+          />
+
+          <Text
+            style={styles.tooltipMiniText}
+          >
+            Over Budget
+          </Text>
+
+        </View>
+
+      </View>
+
+    </View>
+  );
+}
+
+/* =====================================================
+   COLOR ENGINE
+===================================================== */
+
+function getCategoryColor(
+
+  cat: CategoryLike,
+
+  value: number,
+
+  theme: ReturnType<
+    typeof useTheme
+  >["theme"],
+
+  mode: Mode,
+
+  index: number
+
+): string {
+
+  const budget =
+    safeNumber(
+      cat?.budget
+    );
+
+  if (
+    mode ===
+    "spending"
+  ) {
+
+    const palette = [
+
+      theme.colors.chart1,
+      theme.colors.chart2,
+      theme.colors.chart3,
+      theme.colors.chart4,
+      theme.colors.chart5,
+      theme.colors.chart6,
+      theme.colors.success,
+      theme.colors.warning,
+    ];
+
+    return palette[
+      index %
+        palette.length
+    ];
+  }
+
+  if (budget <= 0) {
+
+    return theme.colors
+      .divider;
+  }
+
+  const ratio =
+    value / budget;
+
+  if (ratio >= 1) {
+
+    return theme.colors
+      .danger;
+  }
+
+  if (ratio >= 0.7) {
+
+    return theme.colors
+      .warning;
+  }
+
+  return theme.colors
+    .success;
+}
+
+/* =====================================================
+   STYLES
+===================================================== */
+
+const styles =
+  StyleSheet.create({
+
+    wrapper: {
+
+      alignItems:
+        "center",
+    },
+
+    container: {
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+
+      alignSelf:
+        "center",
+
+      position:
+        "relative",
+    },
+
+    emptyContainer: {
+
+      width: "100%",
+
+      paddingVertical: 40,
+
+      borderWidth: 1,
+
+      borderRadius: 24,
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+    },
+
+    emptyText: {
+
+      fontSize: 14,
+    },
+
+    centerContent: {
+
+      position:
+        "absolute",
+
+      top: 0,
+
+      left: 0,
+
+      right: 0,
+
+      bottom: 0,
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+
+      transform: [
+        {
+          translateY: -2,
+        },
+      ],
+    },
+
+    remainingValue: {
+
+      textAlign:
+        "center",
+
+      letterSpacing:
+        -1.5,
+
+      includeFontPadding:
+        false,
+    },
+
+    remainingLabel: {
+
+      marginTop: -6,
+
+      textAlign:
+        "center",
+
+      letterSpacing:
+        1.2,
+
+      includeFontPadding:
+        false,
+    },
+
+    legendContainer: {
+
+      marginTop: 14,
+
+      flexDirection:
+        "row",
+
+      flexWrap: "wrap",
+
+      justifyContent:
+        "center",
+
+      gap: 12,
+
+      paddingHorizontal: 10,
+    },
+
+    legendRow: {
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+    },
+
+    legendDot: {
+
+      width: 10,
+
+      height: 10,
+
+      borderRadius: 5,
+
+      marginRight: 6,
+    },
+
+    legendText: {
+
+      fontSize: 12,
+    },
+
+    tooltipContainer: {
+
+      marginTop: 14,
+
+      borderWidth: 1,
+
+      borderRadius: 16,
+
+      paddingVertical: 12,
+
+      paddingHorizontal: 14,
+
+      width: "92%",
+    },
+
+    tooltipTitle: {
+
+      fontSize: 13,
+
+      marginBottom: 6,
+    },
+
+    tooltipText: {
+
+      fontSize: 11,
+
+      lineHeight: 18,
+
+      marginBottom: 4,
+    },
+
+    tooltipLegendRow: {
+
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      flexWrap: "wrap",
+
+      marginTop: 8,
+    },
+
+    tooltipDot: {
+
+      width: 8,
+
+      height: 8,
+
+      borderRadius: 4,
+
+      marginRight: 6,
+
+      marginLeft: 10,
+    },
+
+    tooltipMiniText: {
+
+      fontSize: 10,
+    },
+
+    segmentTooltip: {
+
+      marginBottom: 14,
+
+      borderWidth: 1,
+
+      borderRadius: 18,
+
+      paddingVertical: 10,
+
+      paddingHorizontal: 14,
+
+      minWidth: 160,
+
+      alignItems: "center",
+    },
+
+    segmentTooltipDot: {
+
+      width: 10,
+
+      height: 10,
+
+      borderRadius: 5,
+
+      marginBottom: 8,
+    },
+
+    segmentTooltipTitle: {
+
+      fontSize: 13,
+
+      marginBottom: 4,
+    },
+
+    segmentTooltipText: {
+
+      fontSize: 11,
+
+      marginBottom: 2,
+    },
+  });

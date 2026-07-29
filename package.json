@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "react-native-svg": "^15.15.5",
+    "victory-native": "^41.20.3"
+  },
+  "devDependencies": {
+    "eslint-import-resolver-typescript": "^4.4.4"
+  }
+}

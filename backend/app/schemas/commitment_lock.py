@@ -15,14 +15,10 @@ from app.policy.context import FinancialContext
 # --------------------------------------------------
 
 def validate_iso_currency(code: str) -> str:
-
     code = code.upper()
-
     currency = pycountry.currencies.get(alpha_3=code)
-
     if currency is None:
         raise ValueError(f"Invalid ISO 4217 currency code: {code}")
-
     return code
 
 
@@ -31,14 +27,10 @@ def validate_iso_currency(code: str) -> str:
 # --------------------------------------------------
 
 def validate_country(code: str) -> str:
-
     code = code.upper()
-
     country = pycountry.countries.get(alpha_2=code)
-
     if country is None:
         raise ValueError(f"Invalid ISO country code: {code}")
-
     return code
 
 
@@ -47,12 +39,9 @@ def validate_country(code: str) -> str:
 # --------------------------------------------------
 
 class Assumptions(BaseModel):
-
     annual_return: Decimal = Field(..., ge=0)
     annual_inflation: Decimal = Field(..., ge=0)
-
     source: Literal["user", "default", "regional"]
-
     model_config = {"frozen": True}
 
 
@@ -61,11 +50,9 @@ class Assumptions(BaseModel):
 # --------------------------------------------------
 
 class PolicyVersions(BaseModel):
-
     tax_policy: Optional[str] = None
     macro_policy: Optional[str] = None
     income_policy: Optional[str] = None
-
     model_config = {"frozen": True}
 
 
@@ -175,17 +162,89 @@ class CommitmentLockRequest(BaseModel):
     # Demographic context
     # -----------------------------
 
-    age: Optional[int] = Field(None, ge=18, le=100)
+    age: Optional[int] = Field(None, ge=13, le=120)
 
     employment_type: Optional[
         Literal[
             "salary",
+            "full_time",
+            "part_time",
             "self_employed",
+            "freelance",
             "contract",
             "student",
-            "retired"
+            "retired",
+            "unemployed",
         ]
     ] = None
+
+    # -----------------------------
+    # Risk & investment profile
+    # -----------------------------
+
+    risk_tolerance: Optional[
+        Literal[
+            "conservative",
+            "moderate",
+            "aggressive",
+        ]
+    ] = None
+
+    investment_experience: Optional[
+        Literal[
+            "beginner",
+            "intermediate",
+            "advanced",
+            "expert",
+        ]
+    ] = None
+
+    # -----------------------------
+    # Financial snapshot
+    # -----------------------------
+
+    savings_buffer: Optional[Decimal] = Field(None, ge=0)
+    existing_debt: Optional[Decimal] = Field(None, ge=0)
+    emergency_fund_months: Optional[int] = Field(None, ge=0, le=36)
+
+    # -----------------------------
+    # Behavioral profile
+    # -----------------------------
+
+    lifestyle_priority: Optional[
+        Literal[
+            "minimalist",
+            "balanced",
+            "comfortable",
+        ]
+    ] = None
+
+    income_stability: Optional[
+        Literal[
+            "very_stable",
+            "stable",
+            "variable",
+            "unpredictable",
+        ]
+    ] = None
+
+    financial_goal: Optional[
+        Literal[
+            "emergency_fund",
+            "pay_off_debt",
+            "save_for_home",
+            "grow_investments",
+            "retirement",
+        ]
+    ] = None
+
+    # -----------------------------
+    # Lifestyle utility inputs
+    # -----------------------------
+
+    family_value: Optional[float] = Field(None, ge=0, le=10)
+    personal_satisfaction: Optional[float] = Field(None, ge=0, le=10)
+    commute_improvement: Optional[bool] = None
 
     # -----------------------------
     # Client metadata
@@ -217,11 +276,9 @@ class CommitmentLockRequest(BaseModel):
 # --------------------------------------------------
 
 class ReasonCode(BaseModel):
-
     code: str
     severity: Literal["low", "medium", "high"]
     message: str
-
     model_config = {"frozen": True}
 
 
@@ -240,44 +297,20 @@ class CommitmentLockResponse(BaseModel):
     calculation_timestamp: Optional[datetime] = None
     processing_ms: Optional[int] = None
 
-    # -----------------------------
-    # Context
-    # -----------------------------
-
     currency: str
     region: Optional[str] = None
-
-    # -----------------------------
-    # Commitment information
-    # -----------------------------
 
     total_paid: Decimal
     monthly_payment: Decimal
     term_months: int
 
-    # -----------------------------
-    # Economic assumptions used
-    # -----------------------------
-
     annual_return_used: Decimal
     annual_inflation_used: Decimal
 
-    # -----------------------------
-    # Opportunity cost modeling
-    # -----------------------------
-
     future_value_if_invested: Decimal
-
-    # -----------------------------
-    # Income ratios
-    # -----------------------------
 
     income_share: Optional[Decimal] = None
     free_cashflow_share: Optional[Decimal] = None
-
-    # -----------------------------
-    # Tax modeling
-    # -----------------------------
 
     effective_tax_rate_used: Optional[Decimal] = None
     tax_fallback_used: Optional[bool] = None
@@ -286,21 +319,9 @@ class CommitmentLockResponse(BaseModel):
         Literal["low", "medium", "high"]
     ] = None
 
-    # -----------------------------
-    # Policy tracking
-    # -----------------------------
-
     policy_versions: Optional[PolicyVersions] = None
 
-    # -----------------------------
-    # Goal delay impact
-    # -----------------------------
-
     goal_delay_months: Optional[int] = None
-
-    # -----------------------------
-    # Lock scoring
-    # -----------------------------
 
     lock_score: int
 
@@ -308,35 +329,15 @@ class CommitmentLockResponse(BaseModel):
         Literal["low", "medium", "high"]
     ] = None
 
-    # -----------------------------
-    # Engine confidence
-    # -----------------------------
-
     engine_confidence: Optional[
         Literal["low", "medium", "high"]
     ] = None
 
-    # -----------------------------
-    # Explainability
-    # -----------------------------
-
     reasons: List[ReasonCode]
-
-    # -----------------------------
-    # Assumptions metadata
-    # -----------------------------
 
     assumptions_used: Optional[Assumptions] = None
 
-    # -----------------------------
-    # Data completeness
-    # -----------------------------
-
     data_completeness: Optional[Decimal] = None
-
-    # -----------------------------
-    # Currency validation
-    # -----------------------------
 
     @field_validator("currency")
     @classmethod

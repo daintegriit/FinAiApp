@@ -15,10 +15,10 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Fallback for development / CI environments
 if not DATABASE_URL:
-    DATABASE_URL = "sqlite:///./dev.db"
-
+    raise RuntimeError(
+        "DATABASE_URL is missing"
+    )
 # --------------------------------------------------
 # Engine Configuration
 # --------------------------------------------------
@@ -33,11 +33,13 @@ if DATABASE_URL.startswith("sqlite"):
 
 else:
     # Production databases
+    # With max-instances=20 on Cloud Run, keep per-instance pool small
+    # to avoid exceeding Postgres max_connections (default ~100)
     engine_kwargs.update(
         {
-            "pool_size": 10,
-            "max_overflow": 20,
-            "pool_timeout": 30,
+            "pool_size": 3,
+            "max_overflow": 2,
+            "pool_timeout": 10,
             "pool_recycle": 1800,
         }
     )

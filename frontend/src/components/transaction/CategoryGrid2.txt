@@ -1,0 +1,1431 @@
+import React, { useRef, useState, useEffect } from "react";
+import {
+  Alert,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  Animated,
+  useWindowDimensions,
+  TextInput,
+} from "react-native";
+
+import Svg, { Circle } from "react-native-svg";
+
+import * as IoniconGlyphs
+from "@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/Ionicons.json";
+
+import { Ionicons }
+from "@expo/vector-icons";
+
+import { useTheme }
+from "../../../src/theme/ThemeContext";
+
+import {
+  useFinanceStore,
+  DEFAULT_CATEGORIES,
+} from "../../../src/store/financeStore";
+
+const COLS = 5;
+const ROWS = 3;
+const PAGE_SIZE = 15;
+const SIDE_PADDING = 20;
+
+const ALL_ICONS =
+  Object.keys(IoniconGlyphs);
+
+const ICON_KEYWORDS:
+Record<string, string[]> = {
+
+  "cafe-outline":
+    ["coffee", "drink", "cafe"],
+
+  "fast-food-outline":
+    ["food", "burger", "meal"],
+
+  "restaurant-outline":
+    ["restaurant", "dinner", "eat"],
+
+  "car-outline":
+    ["car", "drive", "vehicle"],
+
+  "airplane-outline":
+    ["travel", "flight", "plane"],
+
+  "home-outline":
+    ["home", "house"],
+
+  "business-outline":
+    ["building", "office"],
+
+  "wallet-outline":
+    ["money", "wallet", "finance"],
+
+  "cash-outline":
+    ["cash", "money"],
+
+  "card-outline":
+    ["card", "payment"],
+
+  "game-controller-outline":
+    ["game", "gaming"],
+
+  "barbell-outline":
+    ["gym", "fitness"],
+
+  "medkit-outline":
+    ["health", "medical"],
+
+  "school-outline":
+    ["school", "education"],
+
+  "cart-outline":
+    ["shopping", "cart"],
+
+  "happy-outline":
+    ["kids", "fun", "smile"],
+};
+
+/* ===================================================== */
+/* 🔥 CATEGORY RING */
+/* ===================================================== */
+
+function CategoryRing({
+  progress,
+  size,
+  color,
+  theme,
+}: any) {
+
+  const radius =
+    size / 2 - 4;
+
+  const strokeWidth = 5;
+
+  const circumference =
+    2 * Math.PI * radius;
+
+  const clamped =
+    Math.min(
+      Math.max(progress || 0, 0),
+      1
+    );
+
+  const offset =
+    circumference * (1 - clamped);
+
+  return (
+    <Svg
+      width={size}
+      height={size}
+      style={{
+        position: "absolute",
+      }}
+    >
+      {/* TRACK */}
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={
+          theme.colors.border
+        }
+        strokeWidth={strokeWidth}
+        fill="none"
+      />
+
+      {/* PROGRESS */}
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        rotation="-90"
+        origin={`${size / 2}, ${size / 2}`}
+        fill="none"
+      />
+    </Svg>
+  );
+}
+
+/* ===================================================== */
+/* 🔥 CATEGORY TILE */
+/* ===================================================== */
+
+function CategoryItem({
+  cat,
+  selected,
+  setSelected,
+  theme,
+  size,
+  onLongPress,
+  onRequireBudget,
+}: any) {
+
+  const isSelected =
+    selected === cat.name;
+
+  const scale =
+    useRef(
+      new Animated.Value(1)
+    ).current;
+
+  useEffect(() => {
+
+    Animated.spring(scale, {
+      toValue:
+        isSelected
+          ? 1.05
+          : 1,
+
+      useNativeDriver: true,
+    }).start();
+
+  }, [isSelected]);
+
+  const spent =
+    cat.spent || 0;
+
+  const budget =
+    cat.budget || 0;
+
+  const progress =
+    budget > 0
+      ? spent / budget
+      : 0;
+
+  let ringColor =
+    theme.colors.border;
+
+  if (progress > 0.9) {
+    ringColor =
+      theme.colors.danger;
+  }
+
+  else if (progress > 0.7) {
+    ringColor =
+      theme.colors.warning;
+  }
+
+  else if (progress > 0) {
+    ringColor =
+      theme.colors.success;
+  }
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.item,
+        {
+          width: size,
+        },
+      ]}
+      activeOpacity={0.8}
+      delayLongPress={400}
+      onLongPress={onLongPress}
+      onPress={() => {
+
+        if (
+          !cat.budget ||
+          cat.budget === 0
+        ) {
+
+          onRequireBudget?.(cat);
+          return;
+        }
+
+        setSelected(
+          selected === cat.name
+            ? null
+            : cat.name
+        );
+      }}
+    >
+      <View
+        style={{
+          width: 52,
+          height: 52,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+
+        {/* RING */}
+        {cat.budget > 0 && (
+
+          <CategoryRing
+            progress={
+              Math.max(
+                progress,
+                0.05
+              )
+            }
+            size={52}
+            color={ringColor}
+            theme={theme}
+          />
+        )}
+
+        {/* ICON CIRCLE */}
+        <Animated.View
+          style={[
+            styles.circle,
+
+            {
+              transform: [
+                { scale }
+              ],
+
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+
+              backgroundColor:
+                isSelected
+                  ? theme.colors.primary
+                  : theme.colors.surface,
+
+              borderWidth: 1,
+
+              borderColor:
+                isSelected
+                  ? theme.colors.primary
+                  : theme.colors.border,
+            },
+          ]}
+        >
+          <Ionicons
+            name={cat.icon}
+            size={20}
+            color={
+              isSelected
+                ? theme.colors.textInverse
+                : theme.colors.textSecondary
+            }
+          />
+        </Animated.View>
+      </View>
+
+      {/* LABEL */}
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.label,
+          {
+            color:
+              isSelected
+                ? theme.colors.text
+                : theme.colors.textSecondary,
+
+            fontFamily:
+              theme.fonts.medium,
+          },
+        ]}
+      >
+        {cat.name}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+/* ===================================================== */
+/* 🔥 CREATE TILE */
+/* ===================================================== */
+
+function CreateTile({
+  theme,
+  size,
+  onPress,
+}: any) {
+
+  const scale =
+    useRef(
+      new Animated.Value(1)
+    ).current;
+
+  useEffect(() => {
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, {
+          toValue: 1.05,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+  }, []);
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.item,
+        { width: size },
+      ]}
+      activeOpacity={0.8}
+      onPress={onPress}
+    >
+      <Animated.View
+        style={[
+          styles.circle,
+
+          {
+            transform: [
+              { scale }
+            ],
+
+            backgroundColor:
+              theme.colors.surface,
+
+            borderColor:
+              theme.colors.border,
+          },
+        ]}
+      >
+        <Ionicons
+          name="add"
+          size={22}
+          color={
+            theme.colors.text
+          }
+        />
+      </Animated.View>
+
+      <Text
+        style={[
+          styles.label,
+          {
+            color:
+              theme.colors.text,
+
+            fontFamily:
+              theme.fonts.medium,
+          },
+        ]}
+      >
+        Create
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+/* ===================================================== */
+/* 🔒 LOCKED TILE */
+/* ===================================================== */
+
+function LockedTile({
+  theme,
+  size,
+}: any) {
+
+  return (
+    <View
+      style={[
+        styles.item,
+        { width: size },
+      ]}
+    >
+      <View
+        style={[
+          styles.circle,
+
+          {
+            backgroundColor:
+              theme.colors.surface,
+
+            borderColor:
+              theme.colors.border,
+
+            opacity: 0.35,
+          },
+        ]}
+      >
+        <Ionicons
+          name="lock-closed"
+          size={18}
+          color={
+            theme.colors.textMuted
+          }
+        />
+      </View>
+
+      <Text
+        style={[
+          styles.label,
+
+          {
+            color:
+              theme.colors.textMuted,
+
+            opacity: 0.5,
+
+            fontFamily:
+              theme.fonts.medium,
+          },
+        ]}
+      >
+        Locked
+      </Text>
+    </View>
+  );
+}
+
+/* ===================================================== */
+/* 💎 MAIN GRID */
+/* ===================================================== */
+
+export default function CategoryGrid({
+  selected,
+  setSelected,
+}: any) {
+
+  const { theme } =
+    useTheme();
+
+  const { width } =
+    useWindowDimensions();
+
+  const setCategoryBudget =
+    useFinanceStore(
+      (s) => s.setCategoryBudget
+    );
+
+  const [pageIndex, setPageIndex] =
+    useState(0);
+
+  const userGrid =
+    useFinanceStore(
+      (s) => s.userCategoryGrid
+    );
+
+  const addUserCategory =
+    useFinanceStore(
+      (s) => s.addUserCategory
+    );
+
+  const removeUserCategory =
+    useFinanceStore(
+      (s) => s.removeUserCategory
+    );
+
+  const [budgetModal, setBudgetModal] =
+    useState<any>(null);
+
+  const [budgetInput, setBudgetInput] =
+    useState("");
+
+  const [creating, setCreating] =
+    useState(false);
+
+  const [newName, setNewName] =
+    useState("");
+
+  const [selectedIcon, setSelectedIcon] =
+    useState<string | null>(null);
+
+  const [iconSearch, setIconSearch] =
+    useState("");
+
+  const activeQuery =
+    iconSearch || newName;
+
+  const filteredIcons =
+    ALL_ICONS.filter((icon) =>
+      icon
+        .toLowerCase()
+        .includes(
+          activeQuery.toLowerCase()
+        )
+    );
+
+  const suggestedIcons =
+    ALL_ICONS.filter((icon) => {
+
+      const keywords =
+        ICON_KEYWORDS[icon];
+
+      if (!keywords)
+        return false;
+
+      return keywords.some((k) =>
+        k.includes(
+          activeQuery.toLowerCase()
+        )
+      );
+    });
+
+  const topMatch =
+    suggestedIcons[0];
+
+  const pageWidth = width;
+
+  const gridWidth =
+    pageWidth - SIDE_PADDING * 2;
+
+  const itemSize =
+    gridWidth / COLS;
+
+  const defaultNames =
+    DEFAULT_CATEGORIES.map((c) =>
+      c.name
+        .trim()
+        .toLowerCase()
+    );
+
+  const filteredUserGrid =
+    userGrid.filter(
+      (c) =>
+        !defaultNames.includes(
+          c.name
+            .trim()
+            .toLowerCase()
+        )
+    );
+
+  const userPage: any[] = [];
+
+  for (let i = 0; i < PAGE_SIZE; i++) {
+
+    if (i < filteredUserGrid.length) {
+      userPage.push(
+        filteredUserGrid[i]
+      );
+    }
+
+    else if (
+      i === filteredUserGrid.length
+    ) {
+
+      userPage.push({
+        type: "create",
+      });
+    }
+
+    else {
+
+      userPage.push({
+        type: "locked",
+      });
+    }
+  }
+
+  const categoriesWithState =
+    DEFAULT_CATEGORIES.map((cat) => {
+
+      const normalized =
+        cat.name
+          .trim()
+          .toLowerCase();
+
+      const match =
+        userGrid.find(
+          (c) =>
+            c.name
+              .trim()
+              .toLowerCase() === normalized
+        );
+
+      return {
+        ...cat,
+        budget:
+          match?.budget ?? 0,
+
+        spent:
+          match?.spent ?? 0,
+      };
+    });
+
+  const pages = [
+    categoriesWithState,
+    userPage,
+  ];
+
+  const openBudgetModal = (
+    cat: any
+  ) => {
+
+    setBudgetModal(cat);
+    setBudgetInput("");
+  };
+
+  return (
+    <View
+      style={{
+        flex: 1,
+      }}
+    >
+      <FlatList
+        data={pages}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={pageWidth}
+        keyExtractor={(_, i) =>
+          i.toString()
+        }
+        onMomentumScrollEnd={(e) => {
+
+          const index =
+            Math.round(
+              e.nativeEvent.contentOffset.x /
+              pageWidth
+            );
+
+          setPageIndex(index);
+        }}
+        renderItem={({ item, index }) => (
+          <View
+            style={{
+              width: pageWidth,
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                width: gridWidth,
+                paddingTop: 10,
+              }}
+            >
+              {Array.from({
+                length: ROWS,
+              }).map((_, row) => (
+
+                <View
+                  key={row}
+                  style={styles.row}
+                >
+                  {item
+                    .slice(
+                      row * COLS,
+                      row * COLS + COLS
+                    )
+                    .map((cat: any, i: number) => {
+
+                      if (index === 1) {
+
+                        if (cat.type === "create") {
+
+                          return (
+                            <CreateTile
+                              key={i}
+                              theme={theme}
+                              size={itemSize}
+                              onPress={() =>
+                                setCreating(true)
+                              }
+                            />
+                          );
+                        }
+
+                        if (cat.type === "locked") {
+
+                          return (
+                            <LockedTile
+                              key={i}
+                              theme={theme}
+                              size={itemSize}
+                            />
+                          );
+                        }
+                      }
+
+                      return (
+                        <CategoryItem
+                          key={cat.name || i}
+                          cat={cat}
+                          selected={selected}
+                          setSelected={setSelected}
+                          theme={theme}
+                          size={itemSize}
+                          onRequireBudget={openBudgetModal}
+                          onLongPress={() => {
+
+                            if (cat.isDefault)
+                              return;
+
+                            Alert.alert(
+                              "Delete Category",
+                              `Delete "${cat.name}"?`,
+                              [
+                                {
+                                  text: "Cancel",
+                                  style: "cancel",
+                                },
+
+                                {
+                                  text: "Delete",
+                                  style: "destructive",
+
+                                  onPress: () =>
+                                    removeUserCategory(
+                                      cat.name
+                                    ),
+                                },
+                              ]
+                            );
+                          }}
+                        />
+                      );
+                    })}
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+      />
+
+      {/* DOTS */}
+      <View style={styles.dots}>
+        {pages.map((_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.dot,
+
+              {
+                opacity:
+                  pageIndex === i
+                    ? 1
+                    : 0.3,
+
+                backgroundColor:
+                  theme.colors.text,
+              },
+            ]}
+          />
+        ))}
+      </View>
+
+      {/* ================================================= */}
+      {/* 🔥 CREATE MODAL */}
+      {/* ================================================= */}
+
+      {creating && (
+
+        <View
+          style={[
+            styles.modalOverlay,
+
+            {
+              backgroundColor:
+                theme.colors.overlay,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.modal,
+
+              {
+                backgroundColor:
+                  theme.colors.card,
+
+                borderColor:
+                  theme.colors.border,
+              },
+            ]}
+          >
+
+            <Text
+              style={[
+                styles.modalTitle,
+
+                {
+                  color:
+                    theme.colors.text,
+
+                  fontFamily:
+                    theme.fonts.semibold,
+                },
+              ]}
+            >
+              New Category
+            </Text>
+
+            <TextInput
+              value={newName}
+              onChangeText={setNewName}
+              placeholder="e.g. Coffee"
+              placeholderTextColor={
+                theme.colors.placeholder
+              }
+              style={[
+                styles.input,
+
+                {
+                  backgroundColor:
+                    theme.colors.input,
+
+                  borderColor:
+                    theme.colors.border,
+
+                  color:
+                    theme.colors.text,
+
+                  fontFamily:
+                    theme.fonts.primary,
+                },
+              ]}
+            />
+
+            <Text
+              style={[
+                styles.iconLabel,
+
+                {
+                  color:
+                    theme.colors.textSecondary,
+
+                  fontFamily:
+                    theme.fonts.primary,
+                },
+              ]}
+            >
+              Select Icon
+            </Text>
+
+            <TextInput
+              value={iconSearch}
+              onChangeText={setIconSearch}
+              placeholder="Search icon"
+              placeholderTextColor={
+                theme.colors.placeholder
+              }
+              style={[
+                styles.input,
+
+                {
+                  backgroundColor:
+                    theme.colors.input,
+
+                  borderColor:
+                    theme.colors.border,
+
+                  color:
+                    theme.colors.text,
+
+                  fontFamily:
+                    theme.fonts.primary,
+                },
+              ]}
+            />
+
+            {topMatch && (
+
+              <View style={styles.section}>
+
+                <Text
+                  style={[
+                    styles.sectionTitle,
+
+                    {
+                      color:
+                        theme.colors.textSecondary,
+
+                      fontFamily:
+                        theme.fonts.medium,
+                    },
+                  ]}
+                >
+                  Top Match
+                </Text>
+
+                <TouchableOpacity
+                  style={[
+                    styles.iconOption,
+
+                    styles.iconSelected,
+
+                    {
+                      backgroundColor:
+                        theme.colors.primary,
+                    },
+                  ]}
+                  onPress={() =>
+                    setSelectedIcon(
+                      topMatch
+                    )
+                  }
+                >
+                  <Ionicons
+                    name={topMatch as any}
+                    size={22}
+                    color={
+                      theme.colors.textInverse
+                    }
+                  />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={styles.section}>
+
+              <Text
+                style={[
+                  styles.sectionTitle,
+
+                  {
+                    color:
+                      theme.colors.textSecondary,
+
+                    fontFamily:
+                      theme.fonts.medium,
+                  },
+                ]}
+              >
+                All Icons
+              </Text>
+
+              <FlatList
+                data={filteredIcons}
+                numColumns={5}
+                keyExtractor={(item) => item}
+                showsVerticalScrollIndicator={false}
+                style={{
+                  maxHeight: 120,
+                }}
+                renderItem={({ item: icon }) => {
+
+                  const isSelected =
+                    selectedIcon === icon;
+
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.iconOption,
+
+                        {
+                          backgroundColor:
+                            isSelected
+                              ? theme.colors.primary
+                              : theme.colors.surface,
+
+                          borderColor:
+                            isSelected
+                              ? theme.colors.primary
+                              : theme.colors.border,
+                        },
+                      ]}
+                      onPress={() =>
+                        setSelectedIcon(
+                          selectedIcon === icon
+                            ? null
+                            : icon
+                        )
+                      }
+                    >
+                      <Ionicons
+                        name={icon as any}
+                        size={20}
+                        color={
+                          isSelected
+                            ? theme.colors.textInverse
+                            : theme.colors.text
+                        }
+                      />
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            </View>
+
+            <View style={styles.modalActions}>
+
+              <TouchableOpacity
+                onPress={() =>
+                  setCreating(false)
+                }
+              >
+                <Text
+                  style={[
+                    styles.cancel,
+
+                    {
+                      color:
+                        theme.colors.textMuted,
+
+                      fontFamily:
+                        theme.fonts.medium,
+                    },
+                  ]}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+
+                  if (
+                    !newName.trim()
+                  ) return;
+
+                  addUserCategory({
+                    name: newName,
+
+                    icon:
+                      selectedIcon ||
+                      "ellipse-outline",
+                  });
+
+                  setNewName("");
+                  setSelectedIcon(null);
+                  setCreating(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.save,
+
+                    {
+                      color:
+                        theme.colors.primary,
+
+                      fontFamily:
+                        theme.fonts.semibold,
+                    },
+                  ]}
+                >
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* ================================================= */}
+      {/* 🔥 BUDGET MODAL */}
+      {/* ================================================= */}
+
+      {budgetModal && (
+
+        <View
+          style={[
+            styles.modalOverlay,
+
+            {
+              backgroundColor:
+                theme.colors.overlay,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.modal,
+
+              {
+                backgroundColor:
+                  theme.colors.card,
+
+                borderColor:
+                  theme.colors.border,
+              },
+            ]}
+          >
+
+            <Text
+              style={[
+                styles.modalTitle,
+
+                {
+                  color:
+                    theme.colors.text,
+
+                  fontFamily:
+                    theme.fonts.semibold,
+                },
+              ]}
+            >
+              Set Budget for{" "}
+              {budgetModal.name}
+            </Text>
+
+            <TextInput
+              keyboardType="numeric"
+              value={budgetInput}
+              onChangeText={setBudgetInput}
+              placeholder="Enter budget"
+              placeholderTextColor={
+                theme.colors.placeholder
+              }
+              style={[
+                styles.input,
+
+                {
+                  backgroundColor:
+                    theme.colors.input,
+
+                  borderColor:
+                    theme.colors.border,
+
+                  color:
+                    theme.colors.text,
+
+                  fontFamily:
+                    theme.fonts.primary,
+                },
+              ]}
+            />
+
+            <View style={styles.modalActions}>
+
+              <TouchableOpacity
+                onPress={() =>
+                  setBudgetModal(null)
+                }
+              >
+                <Text
+                  style={[
+                    styles.cancel,
+
+                    {
+                      color:
+                        theme.colors.textMuted,
+
+                      fontFamily:
+                        theme.fonts.medium,
+                    },
+                  ]}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+
+                  if (
+                    !budgetInput
+                  ) return;
+
+                  setCategoryBudget(
+                    budgetModal.name,
+                    Number(
+                      budgetInput
+                    )
+                  );
+
+                  setBudgetModal(null);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.save,
+
+                    {
+                      color:
+                        theme.colors.primary,
+
+                      fontFamily:
+                        theme.fonts.semibold,
+                    },
+                  ]}
+                >
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/* ===================================================== */
+/* 🎨 STYLES */
+/* ===================================================== */
+
+const styles =
+  StyleSheet.create({
+
+    row: {
+
+      flexDirection: "row",
+
+      justifyContent: "space-between",
+
+      marginBottom: 18,
+    },
+
+    item: {
+
+      alignItems: "center",
+    },
+
+    circle: {
+
+      width: 52,
+
+      height: 52,
+
+      borderRadius: 26,
+
+      borderWidth: 1,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+    },
+
+    label: {
+
+      fontSize: 11,
+
+      marginTop: 6,
+
+      textAlign: "center",
+    },
+
+    dots: {
+
+      flexDirection: "row",
+
+      justifyContent: "center",
+
+      marginTop: 6,
+    },
+
+    dot: {
+
+      width: 6,
+
+      height: 6,
+
+      borderRadius: 3,
+
+      marginHorizontal: 4,
+    },
+
+    modalOverlay: {
+
+      position: "absolute",
+
+      top: 0,
+
+      left: 0,
+
+      right: 0,
+
+      bottom: 0,
+
+      justifyContent: "flex-start",
+
+      alignItems: "center",
+
+      paddingTop: 60,
+
+      zIndex: 999,
+    },
+
+    modal: {
+
+      width: "88%",
+
+      borderRadius: 18,
+
+      padding: 20,
+
+      borderWidth: 1,
+    },
+
+    modalTitle: {
+
+      fontSize: 18,
+
+      marginBottom: 14,
+    },
+
+    input: {
+
+      borderWidth: 1,
+
+      borderRadius: 12,
+
+      padding: 14,
+
+      marginBottom: 18,
+    },
+
+    iconLabel: {
+
+      fontSize: 14,
+
+      marginBottom: 10,
+    },
+
+    iconGrid: {
+
+      flexDirection: "row",
+
+      flexWrap: "wrap",
+
+      justifyContent: "space-between",
+
+      marginBottom: 20,
+    },
+
+    iconOption: {
+
+      width: "18%",
+
+      aspectRatio: 1,
+
+      borderRadius: 12,
+
+      borderWidth: 1,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+
+      marginBottom: 10,
+    },
+
+    iconSelected: {
+
+      borderWidth: 0,
+    },
+
+    modalActions: {
+
+      flexDirection: "row",
+
+      justifyContent: "space-between",
+    },
+
+    cancel: {
+
+      fontSize: 14,
+    },
+
+    save: {
+
+      fontSize: 14,
+    },
+
+    section: {
+
+      marginBottom: 18,
+    },
+
+    sectionTitle: {
+
+      fontSize: 13,
+
+      marginBottom: 10,
+    },
+  });

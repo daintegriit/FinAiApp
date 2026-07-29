@@ -1,7 +1,7 @@
-from __future__ import annotations
-
 from pydantic import BaseModel, EmailStr
 from uuid import UUID
+from typing import Optional
+from datetime import datetime
 
 
 # --------------------------------------------------
@@ -40,6 +40,7 @@ class TokenResponse(BaseModel):
 # User Response
 # --------------------------------------------------
 
+
 class UserResponse(BaseModel):
 
     id: UUID
@@ -47,6 +48,27 @@ class UserResponse(BaseModel):
     username: str
     is_active: bool
     is_admin: bool
+    terms_accepted_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+# --------------------------------------------------
+# Google Auth Request
+# --------------------------------------------------
+
+class GoogleAuthRequest(BaseModel):
+
+    id_token: str
+
+
+# --------------------------------------------------
+# Apple Auth Request
+# --------------------------------------------------
+
+class AppleAuthRequest(BaseModel):
+
+    identity_token: str
+    full_name: Optional[str] = None
+    email: Optional[str] = None

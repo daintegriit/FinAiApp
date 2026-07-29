@@ -1,23 +1,21 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.0
-
 pydantic==2.9.2
 pydantic-settings
 pycountry==24.6.1
 python-dotenv==1.0.1
 email-validator==2.2.0
 pydantic[email]==2.9.2
-
-# Database
 sqlalchemy==2.0.36
 passlib[bcrypt]==1.7.4
 python-jose[cryptography]==3.3.0
 psycopg2-binary==2.9.9
-
-# FastAPI testing
 httpx==0.28.1
 starlette==0.38.2
-
-# Testing
 pytest==8.3.2
 pytest-asyncio==0.23.8
+bcrypt==4.0.1
+resend==2.0.0
+slowapi
+sentry-sdk[fastapi]
+anthropic>=0.25.0

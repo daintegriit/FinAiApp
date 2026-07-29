@@ -1,7 +1,19 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
 
-EmploymentType = Literal["w2", "1099", "self_employed", "student", "retired", "unemployed"]
+EmploymentType = Literal[
+    "w2",
+    "1099", 
+    "salary",
+    "full_time",
+    "part_time",
+    "self_employed",
+    "freelance",
+    "contract",
+    "student",
+    "retired",
+    "unemployed",
+]
 
 class FinancialContext(BaseModel):
     country: str = Field(..., min_length=2, max_length=2, description="ISO-3166 alpha-2, e.g. US, GB, DE")

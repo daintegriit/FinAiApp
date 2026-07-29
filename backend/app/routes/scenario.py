@@ -1,36 +1,29 @@
-from __future__ import annotations
 
-import time
 import logging
-
+import time
 from typing import List
 
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 
+from app.auth.dependencies import get_current_active_user
 from app.engines.scenario import (
-    evaluate_scenarios,
-    ScenarioInput,
     ScenarioEngineResponse,
+    ScenarioInput,
+    evaluate_scenarios,
 )
-
-# Optional future dependencies
-# from app.auth.dependencies import get_current_user
-# from app.db.session import get_db
-# from sqlalchemy.orm import Session
-
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
-
 
 router = APIRouter(
     prefix="/scenario",
     tags=["Scenario Engine"],
 )
 
+# Each scenario runs the full financial_state engine chain. Unbounded,
+# a single request with 10,000 entries pins a worker indefinitely.
+MAX_SCENARIOS = 20
 
-# --------------------------------------------------
-# Scenario Simulation
-# --------------------------------------------------
 
 @router.post(
     "/evaluate",
@@ -38,76 +31,48 @@ router = APIRouter(
     summary="Run financial what-if scenario simulations",
 )
 def evaluate(
-    scenarios: List[ScenarioInput],
-    # user = Depends(get_current_user),
-    # db: Session = Depends(get_db),
+    scenarios: List[ScenarioInput] = Body(
+        ..., min_length=1, max_length=MAX_SCENARIOS
+    ),
+    current_user: User = Depends(get_current_active_user),
 ) -> ScenarioEngineResponse:
     """
     Run multiple financial what-if simulations.
 
-    Each scenario can represent changes such as:
-    • salary increase
-    • reduced expenses
-    • new financial commitments
-    • increased investment contributions
-
-    The engine evaluates each scenario and returns
-    comparative results.
+    Pure compute, no AI call, so this is not quota-metered — it stays
+    unlimited as a retention feature. Only /simulations and /ai/narrate
+    consume the monthly allowance.
     """
 
     start = time.perf_counter()
 
     try:
-
-        logger.info("Scenario simulation started (%s scenarios)", len(scenarios))
-
-        # --------------------------------------------------
-        # Execute scenario engine
-        # --------------------------------------------------
+        logger.info(
+            "Scenario simulation started (%s scenarios) for user %s",
+            len(scenarios),
+            current_user.id,
+        )
 
         result = evaluate_scenarios(scenarios)
 
         elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
 
-        logger.info(
-            "Scenario simulation completed in %sms",
-            elapsed_ms
-        )
-
-        # attach runtime metadata if supported
-        if hasattr(result, "processing_ms"):
-            result.processing_ms = elapsed_ms
+        logger.info("Scenario simulation completed in %sms", elapsed_ms)
 
         return result
 
-    # --------------------------------------------------
-    # Validation Errors
-    # --------------------------------------------------
-
     except ValueError as e:
-
-        logger.warning(
-            "Scenario validation error: %s",
-            str(e)
-        )
-
+        logger.warning("Scenario validation error: %s", e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
 
-    # --------------------------------------------------
-    # System Errors
-    # --------------------------------------------------
-
-    except Exception as e:
-
+    except Exception:
+        # Internal messages are no longer echoed to the client: engine
+        # exceptions can carry table names and column values.
         logger.exception("Scenario engine failure")
-
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "error": "Scenario simulation failed",
-                "message": str(e),
-            },
+            detail="Scenario simulation failed",
         )
