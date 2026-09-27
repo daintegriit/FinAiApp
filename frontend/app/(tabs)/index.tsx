@@ -13,6 +13,7 @@ import { useFinanceStore } from "../../src/store/financeStore";
 import { useAuth } from "../../src/context/AuthContext";
 import { api } from "../../src/services/api";
 import { getTransactions } from "../../src/services/transactions";
+import { fetchCategories } from "../../src/services/categories";
 import DashboardHeader from "../../src/components/header/DashboardHeader";
 import CategoryDonut from "../../src/components/dashboard/CategoryDonut";
 import CategoryBreakdown from "../../src/components/dashboard/CategoryBreakdown";
@@ -24,6 +25,9 @@ export default function Dashboard() {
 
   const hasHydrated = useFinanceStore((s) => s.hasHydrated);
   const setTransactions = useFinanceStore((s) => s.setTransactions);
+  const setIncome = useFinanceStore((s) => s.setIncome);
+  const setProfile = useFinanceStore((s) => s.setProfile);
+  const setUserCategoryGrid = useFinanceStore((s) => s.setUserCategoryGrid);
 
   const [profileChecked, setProfileChecked] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -41,7 +45,39 @@ export default function Dashboard() {
 
     async function checkProfile() {
       try {
-        await api.get("/profile");
+        const res = await api.get("/profile");
+        const p = res.data?.profile;
+
+        if (p) {
+          if (p.monthly_income != null) setIncome(Number(p.monthly_income));
+          setProfile({
+            age: p.age ?? undefined,
+            employment_type: p.employment_type ?? undefined,
+            risk_tolerance: p.risk_tolerance ?? undefined,
+            investment_experience: p.investment_experience ?? undefined,
+            savings_buffer: p.savings_amount ?? undefined,
+            existing_debt: p.debt_amount ?? undefined,
+            emergency_fund_months: p.emergency_fund_months ?? undefined,
+            financial_goal: p.financial_goal ?? undefined,
+            lifestyle_priority: p.lifestyle ?? undefined,
+            income_stability: p.income_stability ?? undefined,
+            city: p.city ?? undefined,
+            state: p.state ?? undefined,
+            zip_code: p.zip_code ?? undefined,
+            latitude: p.latitude ?? undefined,
+            longitude: p.longitude ?? undefined,
+          } as any);
+        }
+
+        try {
+          const cats = await fetchCategories(user!.id);
+          if (Array.isArray(cats) && cats.length > 0) {
+            setUserCategoryGrid(cats);
+          }
+        } catch (catErr) {
+          console.error("Failed to hydrate categories:", catErr);
+        }
+
         setProfileChecked(true);
       } catch (err: any) {
         if (err?.isOffline) {
@@ -50,7 +86,6 @@ export default function Dashboard() {
         } else if (err?.response?.status === 404) {
           router.replace("/(auth)/onboarding" as any);
         } else {
-          // Network/server error — still show dashboard with cached data
           setProfileChecked(true);
         }
       }
