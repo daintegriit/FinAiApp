@@ -21,7 +21,6 @@ export default function Navbar() {
           <Link href="/support" style={linkStyle}>Support</Link>
           <Link href="/privacy" style={linkStyle}>Privacy</Link>
           <Link href="/terms" style={linkStyle}>Terms</Link>
-          <Link href="/admin" style={{ ...linkStyle, fontSize: "0.8rem", opacity: 0.55 }}>Admin ↗</Link>
           <a href="#download" style={{ background: "var(--accent)", color: "#fff", padding: "0.55rem 1.3rem", borderRadius: 10, fontWeight: 600, fontSize: "0.875rem", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "0.4rem", boxShadow: "0 1px 2px var(--shadow)" }}>
             <RiAppleLine size={16} /> Download
           </a>
