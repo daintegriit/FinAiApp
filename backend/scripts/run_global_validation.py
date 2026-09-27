@@ -19,6 +19,35 @@ client = TestClient(app)
 
 API_ENDPOINT = "/api/financial/analyze"
 
+# --------------------------------------------------
+# Authentication (endpoint is protected by the global auth guard)
+# --------------------------------------------------
+_VALIDATOR_CREDS = {
+    "email": "validator@finbudgetai.com",
+    "username": "engine_validator",
+    "password": "ValidatorPass123!",
+}
+
+
+def _get_auth_headers() -> Dict[str, str]:
+    client.post("/api/auth/register", json=_VALIDATOR_CREDS)
+    login = client.post(
+        "/api/auth/login",
+        json={
+            "email": _VALIDATOR_CREDS["email"],
+            "password": _VALIDATOR_CREDS["password"],
+        },
+    )
+    if login.status_code != 200:
+        raise RuntimeError(
+            f"Validator login failed ({login.status_code}): {login.text}"
+        )
+    token = login.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+AUTH_HEADERS = _get_auth_headers()
+
 
 # --------------------------------------------------
 # Debug: Print Available Routes
@@ -26,7 +55,11 @@ API_ENDPOINT = "/api/financial/analyze"
 
 print("\nAvailable API Routes:")
 for route in app.routes:
-    print(route.path)
+    # Some entries (mounted sub-routers) don't expose a .path attribute;
+    # only print the ones that do.
+    route_path = getattr(route, "path", None)
+    if route_path:
+        print(route_path)
 
 
 # --------------------------------------------------
@@ -221,7 +254,7 @@ def run_global_validation() -> List[Dict[str, Any]]:
             start = time.perf_counter()
 
             try:
-                response = client.post(API_ENDPOINT, json=payload)
+                response = client.post(API_ENDPOINT, json=payload, headers=AUTH_HEADERS)
             except Exception as e:
                 duration_ms = int((time.perf_counter() - start) * 1000)
 

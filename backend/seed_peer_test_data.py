@@ -21,7 +21,7 @@ from datetime import datetime
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "postgresql+psycopg2://finai_user:finaiapp123@35.237.62.135:5432/finai_db"
+DATABASE_URL = "postgresql+psycopg2://finaiuser:Djfam7533@/finai?host=/cloudsql/finaibudgetingapp:us-east1:finai-db"
 
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
