@@ -50,6 +50,10 @@ interface AuthContextValue extends AuthState {
   loginWithGoogle: (idToken: string) => Promise<User>;
   loginWithApple: () => Promise<User>;
   refreshUser: () => Promise<User>;
+  signInWithBiometrics: () => Promise<User | null>;
+  enableBiometrics: () => Promise<boolean>;
+  disableBiometrics: () => Promise<void>;
+  isBiometricEnabled: () => Promise<boolean>;
 }
 
 /* =====================================================
@@ -205,6 +209,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   /* ===================================================
+     BIOMETRIC SESSION
+  =================================================== */
+
+  // Resume an existing session behind Face ID / Touch ID. Requires a
+  // prior login (tokens in SecureStore). Returns null when there's
+  // nothing stored to unlock, so the caller can prompt for a password.
+  const signInWithBiometrics = useCallback(async (): Promise<User | null> => {
+    const stored = await getAccessToken();
+    if (!stored) return null;
+
+    const available = await isBiometricAvailable();
+    if (!available) return null;
+
+    const passed = await authenticateWithBiometrics();
+    if (!passed) return null;
+
+    // Interceptor attaches the stored token; refreshes transparently if expired.
+    const res = await api.get("/auth/me");
+    setUser(res.data);
+    identifyUser(res.data.id).catch(() => {});
+    return res.data;
+  }, []);
+
+  // Opt in from Settings (or right after a login). Verifies the user's
+  // face once before enabling, so it never gets enabled for the wrong
+  // person on a shared device.
+  const enableBiometrics = useCallback(async (): Promise<boolean> => {
+    const available = await isBiometricAvailable();
+    if (!available) return false;
+    const passed = await authenticateWithBiometrics();
+    if (!passed) return false;
+    await SecureStore.setItemAsync(BIOMETRIC_ENABLED_KEY, "true");
+    return true;
+  }, []);
+
+  const disableBiometrics = useCallback(async (): Promise<void> => {
+    await SecureStore.deleteItemAsync(BIOMETRIC_ENABLED_KEY).catch(() => {});
+  }, []);
+
+  const isBiometricEnabled = useCallback(async (): Promise<boolean> => {
+    const v = await SecureStore.getItemAsync(BIOMETRIC_ENABLED_KEY);
+    const available = await isBiometricAvailable();
+    return v === "true" && available;
+  }, []);
+
+  /* ===================================================
      LOGIN
   =================================================== */
 
@@ -290,6 +340,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loginWithGoogle,
         loginWithApple,
         refreshUser,
+        signInWithBiometrics,
+        enableBiometrics,
+        disableBiometrics,
+        isBiometricEnabled,
       }}
     >
       {children}

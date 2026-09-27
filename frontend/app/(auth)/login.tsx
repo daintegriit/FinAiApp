@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import { useAuth } from "../../src/context/AuthContext";
 import { useTheme } from "../../src/theme/ThemeContext";
 import { Feather } from "@expo/vector-icons";
-import { api } from "../../src/services/api";
+import { api, getAccessToken } from "../../src/services/api";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as AppleAuthentication from "expo-apple-authentication";
 import {
@@ -36,7 +36,7 @@ GoogleSignin.configure({
 
 export default function LoginScreen() {
   const { theme } = useTheme();
-  const { login, loginWithGoogle, loginWithApple } =
+  const { login, loginWithGoogle, loginWithApple, signInWithBiometrics } =
     useAuth();
   const router = useRouter();
 
@@ -46,6 +46,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [biometricAvailable, setBiometricAvailable] =
     useState(false);
@@ -55,6 +56,10 @@ export default function LoginScreen() {
   // ===================================================
   // 🔐 CHECK BIOMETRIC + APPLE ON MOUNT
   // ===================================================
+  // The Face ID button only makes sense when there's actually a stored
+  // session to unlock. A brand-new user with no saved tokens has
+  // nothing to biometric-login into, so we hide the button for them
+  // rather than let it bounce them to onboarding.
 
   useEffect(() => {
     async function checkCapabilities() {
@@ -62,7 +67,8 @@ export default function LoginScreen() {
         await LocalAuthentication.hasHardwareAsync();
       const enrolled =
         await LocalAuthentication.isEnrolledAsync();
-      setBiometricAvailable(compatible && enrolled);
+      const hasStoredSession = !!(await getAccessToken());
+      setBiometricAvailable(compatible && enrolled && hasStoredSession);
 
       const appleSupported =
         await AppleAuthentication.isAvailableAsync();
@@ -74,17 +80,25 @@ export default function LoginScreen() {
   // ===================================================
   // 🔐 BIOMETRIC LOGIN
   // ===================================================
+  // Delegates to AuthContext, which runs Face ID, then restores the
+  // real session from the securely-stored token (via /auth/me). If
+  // there's no stored session it returns null and we tell the user to
+  // sign in with email once first.
 
   async function handleBiometricLogin() {
-    const result =
-      await LocalAuthentication.authenticateAsync({
-        promptMessage: "Sign in to FinBudgetAI",
-        fallbackLabel: "Use Password",
-        disableDeviceFallback: false,
-      });
-
-    if (result.success) {
-      await checkProfileAndRoute("");
+    setError(null);
+    setBiometricLoading(true);
+    try {
+      const user = await signInWithBiometrics();
+      if (user) {
+        await checkProfileAndRoute(user.id);
+      } else {
+        setError("Sign in with your email once to enable Face ID.");
+      }
+    } catch {
+      setError("Face ID sign-in failed. Please use your email and password.");
+    } finally {
+      setBiometricLoading(false);
     }
   }
 
@@ -515,22 +529,29 @@ export default function LoginScreen() {
                 },
               ]}
               onPress={handleBiometricLogin}
+              disabled={biometricLoading}
               activeOpacity={0.8}
             >
-              <Text style={styles.biometricIcon}>
-                􀎽
-              </Text>
-              <Text
-                style={[
-                  styles.biometricLabel,
-                  {
-                    color: theme.colors.textSecondary,
-                    fontFamily: theme.fonts.primary,
-                  },
-                ]}
-              >
-                Sign in with Face ID
-              </Text>
+              {biometricLoading ? (
+                <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+              ) : (
+                <>
+                  <Text style={styles.biometricIcon}>
+                    􀎽
+                  </Text>
+                  <Text
+                    style={[
+                      styles.biometricLabel,
+                      {
+                        color: theme.colors.textSecondary,
+                        fontFamily: theme.fonts.primary,
+                      },
+                    ]}
+                  >
+                    Sign in with Face ID
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           )}
 

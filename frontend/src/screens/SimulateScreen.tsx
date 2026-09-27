@@ -293,6 +293,7 @@ export default function SimulateScreen() {
         category,
         termMonths: parsedTerm,
         forceRefresh: true,
+        persist: false,
       });
 
       if (!result || typeof result !== "object") {

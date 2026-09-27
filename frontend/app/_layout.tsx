@@ -10,6 +10,7 @@ import { useFonts } from "expo-font";
 import { ThemeProvider, useTheme } from "../src/theme/ThemeContext";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
 import OfflineBanner from "../src/components/system/OfflineBanner";
+import InactivityLock from "../src/components/system/InactivityLock";   // ← add this line
 import * as Notifications from "expo-notifications";
 import { configureBilling } from "../src/services/billing";
 
@@ -72,7 +73,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <InactivityLock />
+    </>
+  );
 }
 
 

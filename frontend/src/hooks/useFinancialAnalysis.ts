@@ -85,6 +85,7 @@ export function useFinancialAnalysis() {
       termMonths?: number;
       forceRefresh?: boolean;
       income?: number;
+      persist?: boolean;
     }): Promise<FinancialAnalysisResponse> => {
       // Prefer an explicit override, then the live store value (synchronous
       // in Zustand), then the closed-over selector value. This avoids a
@@ -188,11 +189,12 @@ export function useFinancialAnalysis() {
         }
 
         const normalized = normalizeAnalysis(result);
-
         console.log("✅ NORMALIZED ANALYSIS:", normalized);
-
-        setAnalysis(normalized);
-
+        // Hypothetical runs (simulations) pass persist:false so a
+        // "what-if" purchase never overwrites the real dashboard score.
+        if (override?.persist !== false) {
+          setAnalysis(normalized);
+        }
         return normalized;
 
       } catch (err: any) {

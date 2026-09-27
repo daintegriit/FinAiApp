@@ -4,7 +4,7 @@
 // FILE:
 // app/settings.tsx
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StatusBar,
+  Switch,
   Alert as RNAlert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -44,7 +45,7 @@ type NavigationLink = {
 export default function SettingsScreen() {
   const router = useRouter();
   const { theme, mode, setThemeMode } = useTheme();
-  const { logout, user } = useAuth();
+  const { logout, user, enableBiometrics, disableBiometrics, isBiometricEnabled } = useAuth();
 
   /* ===================================================
      THEMES
@@ -79,6 +80,43 @@ export default function SettingsScreen() {
     ],
     []
   );
+
+  /* ===================================================
+     BIOMETRIC TOGGLE
+  =================================================== */
+
+  const [biometricOn, setBiometricOn] = useState(false);
+  const [biometricBusy, setBiometricBusy] = useState(false);
+
+  useEffect(() => {
+    isBiometricEnabled().then(setBiometricOn).catch(() => setBiometricOn(false));
+  }, []);
+
+  async function handleToggleBiometric(next: boolean) {
+    if (biometricBusy) return;
+    setBiometricBusy(true);
+    try {
+      if (next) {
+        const ok = await enableBiometrics();
+        if (ok) {
+          setBiometricOn(true);
+        } else {
+          setBiometricOn(false);
+          RNAlert.alert(
+            "Couldn't enable Face ID",
+            "Make sure Face ID or Touch ID is set up on your device, and try again."
+          );
+        }
+      } else {
+        await disableBiometrics();
+        setBiometricOn(false);
+      }
+    } catch {
+      RNAlert.alert("Something went wrong", "Please try again.");
+    } finally {
+      setBiometricBusy(false);
+    }
+  }
 
   /* ===================================================
      HANDLERS
@@ -245,6 +283,55 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </>
         )}
+
+        {/* =========================================
+            SECURITY
+        ========================================= */}
+        <Text
+          style={[styles.section, { color: theme.colors.textMuted, fontFamily: theme.fonts.primary, marginTop: 24 }]}
+        >
+          Security
+        </Text>
+
+        <View
+          style={[
+            styles.navLinkCard,
+            { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+          ]}
+        >
+          <View style={styles.leftRow}>
+            <MaterialIcons name="fingerprint" size={22} color={theme.colors.primary} />
+            <View>
+              <Text style={[styles.navLinkTitle, { color: theme.colors.text, fontFamily: theme.fonts.semibold }]}>
+                Sign in with Face ID
+              </Text>
+              <Text style={{ fontSize: 11, color: theme.colors.textMuted, fontFamily: theme.fonts.primary }}>
+                Use Face ID to sign in each time you open the app
+              </Text>
+            </View>
+          </View>
+          <Switch
+            value={biometricOn}
+            onValueChange={handleToggleBiometric}
+            disabled={biometricBusy}
+            trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+            thumbColor={"#FFFFFF"}
+          />
+        </View>
+
+        <Text
+          style={{
+            fontSize: 11,
+            lineHeight: 16,
+            color: theme.colors.textMuted,
+            fontFamily: theme.fonts.primary,
+            marginTop: 8,
+            marginBottom: 4,
+            paddingHorizontal: 4,
+          }}
+        >
+          For your security, you'll need to sign in with your password once. After that, Face ID lets you sign in instantly each time you open FinBudgetAI.
+        </Text>
 
         {/* =========================================
             ACCOUNT
