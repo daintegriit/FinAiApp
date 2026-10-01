@@ -9,12 +9,14 @@ import {
   Platform,
   ActivityIndicator,
   ScrollView,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../src/context/AuthContext";
 import { useTheme } from "../../src/theme/ThemeContext";
 import { Feather } from "@expo/vector-icons";
 import { api, getAccessToken } from "../../src/services/api";
+import Globe from "../../src/components/header/Globe";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as AppleAuthentication from "expo-apple-authentication";
 import {
@@ -33,6 +35,8 @@ GoogleSignin.configure({
     "466323878357-l7a3rcma7e4dfeesk86fo0vghojetpd5.apps.googleusercontent.com",
   offlineAccess: true,
 });
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function LoginScreen() {
   const { theme } = useTheme();
@@ -187,13 +191,31 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[
-        styles.container,
-        { backgroundColor: theme.colors.background },
-      ]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      {/* Subtle background globe — non-interactive, dimmed for ambiance */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: 0.18,
+        }}
+      >
+        <Globe size={SCREEN_WIDTH * 1.5} markers={[]} />
+      </View>
+
+      <KeyboardAvoidingView
+        style={[
+          styles.container,
+          { backgroundColor: "transparent" },
+        ]}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
@@ -288,7 +310,8 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          {/* APPLE */}
+          {/* APPLE — iOS only; hidden on Android where Apple Sign-In isn't available */}
+          {appleAvailable && (
           <TouchableOpacity
             style={[
               styles.socialButton,
@@ -299,7 +322,7 @@ export default function LoginScreen() {
             ]}
             activeOpacity={0.8}
             onPress={handleAppleLogin}
-            disabled={appleLoading || !appleAvailable}
+            disabled={appleLoading}
           >
             {appleLoading ? (
               <ActivityIndicator
@@ -331,6 +354,7 @@ export default function LoginScreen() {
               </>
             )}
           </TouchableOpacity>
+          )}
 
         </View>
 
@@ -558,6 +582,7 @@ export default function LoginScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </View>
   );
 }
 
