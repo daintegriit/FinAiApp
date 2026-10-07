@@ -203,10 +203,10 @@ export default function LoginScreen() {
           bottom: 0,
           alignItems: "center",
           justifyContent: "center",
-          opacity: 0.18,
+          opacity: 0.35,
         }}
       >
-        <Globe size={SCREEN_WIDTH * 1.5} markers={[]} />
+        <Globe size={SCREEN_WIDTH * 1.9} markers={[]} />
       </View>
 
       <KeyboardAvoidingView

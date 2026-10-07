@@ -26,12 +26,14 @@
 // =====================================================
 
 import React, {
+import { useRouter } from "expo-router";
   useMemo,
 } from "react";
 
 import {
   View,
   Text,
+  TouchableOpacity,
   StyleSheet,
 } from "react-native";
 
@@ -144,6 +146,7 @@ export default function RiskGauge({
 
   const { theme } =
     useTheme();
+  const router = useRouter();
 
   /* ===================================================
      SAFE EXTRACTION
@@ -360,9 +363,19 @@ export default function RiskGauge({
           ]}
         >
 
-          Complete your financial profile to generate your score and AI insights.
-
+          No risk assessment yet
         </Text>
+        <TouchableOpacity onPress={() => router.push("/profile")} style={{ marginTop: 8 }}>
+          <Text
+            style={{
+              color: theme.colors.primary,
+              fontFamily: theme.fonts.semibold,
+              fontSize: 13,
+            }}
+          >
+            Complete your profile to assess your risk →
+          </Text>
+        </TouchableOpacity>
 
       </View>
     );

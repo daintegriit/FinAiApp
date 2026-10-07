@@ -21,10 +21,12 @@
 // =====================================================
 
 import React from "react";
+import { useRouter } from "expo-router";
 
 import {
   View,
   Text,
+  TouchableOpacity,
   StyleSheet,
 } from "react-native";
 
@@ -44,6 +46,7 @@ export default function MonthlySummary() {
 
   const { theme } =
     useTheme();
+  const router = useRouter();
 
   /* ===================================================
      STORE
@@ -167,9 +170,19 @@ export default function MonthlySummary() {
           ]}
         >
 
-          Complete your financial profile to generate your score and AI insights.
-
+          No financial summary yet
         </Text>
+        <TouchableOpacity onPress={() => router.push("/profile")} style={{ marginTop: 8 }}>
+          <Text
+            style={{
+              color: theme.colors.primary,
+              fontFamily: theme.fonts.semibold,
+              fontSize: 13,
+            }}
+          >
+            Complete your profile to generate your score →
+          </Text>
+        </TouchableOpacity>
 
       </View>
     );
