@@ -360,7 +360,7 @@ export default function RiskGauge({
           ]}
         >
 
-          No financial analysis available
+          Complete your financial profile to generate your score and AI insights.
 
         </Text>
 

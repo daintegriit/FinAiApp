@@ -167,7 +167,7 @@ export default function MonthlySummary() {
           ]}
         >
 
-          No financial analysis available yet
+          Complete your financial profile to generate your score and AI insights.
 
         </Text>
 

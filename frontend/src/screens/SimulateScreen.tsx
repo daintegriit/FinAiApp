@@ -367,6 +367,36 @@ export default function SimulateScreen() {
         >
           <DashboardHeader hideSettings showBackButton />
 
+          {/* PROFILE PROMPT — shown when no profile yet */}
+          {!profile && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => router.push("/profile")}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                padding: 16,
+                borderRadius: 14,
+                borderWidth: 1,
+                marginBottom: 16,
+                borderColor: theme.colors.primary,
+                backgroundColor: `${theme.colors.primary}14`,
+              }}
+            >
+              <Feather name="user-plus" size={20} color={theme.colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.semibold, fontSize: 14 }}>
+                  Complete your profile to run simulations
+                </Text>
+                <Text style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.primary, fontSize: 12, marginTop: 2 }}>
+                  Set your income and financial details to model scenarios.
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={theme.colors.primary} />
+            </TouchableOpacity>
+          )}
+
           {/* QUOTA BANNER */}
           {quota && !isUnlimited && (
             <QuotaBanner
