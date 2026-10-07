@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   ScrollView,
+  Image,
   Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -224,27 +225,11 @@ export default function LoginScreen() {
 
         {/* BRAND */}
         <View style={styles.brandBlock}>
-          <View
-            style={[
-              styles.logoBox,
-              {
-                backgroundColor: theme.colors.card,
-                borderColor: theme.colors.border,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.logoText,
-                {
-                  color: theme.colors.text,
-                  fontFamily: theme.fonts.semibold,
-                },
-              ]}
-            >
-              F
-            </Text>
-          </View>
+          <Image
+            source={require("../../assets/images/FinbudgetAILight.png")}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
 
           <Text
             style={[
@@ -600,6 +585,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 36,
   },
+  logoImage: { width: 80, height: 80, marginBottom: 16 },
   logoBox: {
     width: 64,
     height: 64,
