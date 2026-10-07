@@ -20,13 +20,14 @@
 //
 // =====================================================
 
-import React from "react";
+import React, { useState } from "react";
 import { useRouter } from "expo-router";
 
 import {
   View,
   Text,
   TouchableOpacity,
+  Modal,
   StyleSheet,
 } from "react-native";
 
@@ -56,6 +57,8 @@ export default function MonthlySummary() {
     useFinanceStore(
       (state) => state.analysis
     );
+  const income = useFinanceStore((state) => state.income);
+  const isAnalyzing = useFinanceStore((state) => state.isAnalyzing);
 
   /* ===================================================
      SAFE ANALYSIS
@@ -110,6 +113,8 @@ export default function MonthlySummary() {
 
     "No major risks detected";
 
+  const [signalOpen, setSignalOpen] = useState(false);
+
   /* ===================================================
      SCORE COLOR
   =================================================== */
@@ -141,6 +146,9 @@ export default function MonthlySummary() {
   =================================================== */
 
   if (!analysis) {
+    // flicker guard: don't show the empty message while analysis is
+    // loading, or when the user already has income (analysis is coming).
+    if (isAnalyzing || income > 0) return null;
 
     return (
 
@@ -342,27 +350,97 @@ export default function MonthlySummary() {
 
         </Text>
 
-        <Text
+        <TouchableOpacity onPress={() => setSignalOpen(true)} activeOpacity={0.7}>
+          <Text
+            numberOfLines={2}
+            style={[
+              styles.smallText,
+              { color: theme.colors.text, fontFamily: theme.fonts.primary },
+            ]}
+          >
+            {topRisk}
+          </Text>
+          <Text
+            style={{
+              color: theme.colors.primary,
+              fontFamily: theme.fonts.primary,
+              fontSize: 11,
+              marginTop: 2,
+            }}
+          >
+            Read more
+          </Text>
+        </TouchableOpacity>
 
-          numberOfLines={2}
-
-          style={[
-
-            styles.smallText,
-
-            {
-              color:
-                theme.colors.text,
-
-              fontFamily:
-                theme.fonts.primary,
-            },
-          ]}
+        <Modal
+          visible={signalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSignalOpen(false)}
         >
-
-          {topRisk}
-
-        </Text>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setSignalOpen(false)}
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              justifyContent: "center",
+              paddingHorizontal: 28,
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: theme.colors.card,
+                borderRadius: 20,
+                padding: 24,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+              }}
+            >
+              <Text
+                style={{
+                  color: theme.colors.text,
+                  fontFamily: theme.fonts.semibold,
+                  fontSize: 18,
+                  marginBottom: 12,
+                }}
+              >
+                Top Signal
+              </Text>
+              <Text
+                style={{
+                  color: theme.colors.text,
+                  fontFamily: theme.fonts.primary,
+                  fontSize: 15,
+                  lineHeight: 22,
+                }}
+              >
+                {topRisk}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setSignalOpen(false)}
+                style={{
+                  marginTop: 20,
+                  alignSelf: "flex-end",
+                  paddingVertical: 8,
+                  paddingHorizontal: 16,
+                  borderRadius: 12,
+                  backgroundColor: theme.colors.primary,
+                }}
+              >
+                <Text
+                  style={{
+                    color: theme.colors.background,
+                    fontFamily: theme.fonts.semibold,
+                    fontSize: 14,
+                  }}
+                >
+                  Close
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
       </View>
 

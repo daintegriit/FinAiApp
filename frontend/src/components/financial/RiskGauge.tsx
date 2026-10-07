@@ -26,6 +26,7 @@
 // =====================================================
 
 import React, {
+import { useFinanceStore } from "../../../src/store/financeStore";
 import { useRouter } from "expo-router";
   useMemo,
 } from "react";
@@ -147,6 +148,8 @@ export default function RiskGauge({
   const { theme } =
     useTheme();
   const router = useRouter();
+  const income = useFinanceStore((state) => state.income);
+  const isAnalyzing = useFinanceStore((state) => state.isAnalyzing);
 
   /* ===================================================
      SAFE EXTRACTION
@@ -333,6 +336,8 @@ export default function RiskGauge({
   =================================================== */
 
   if (!analysis) {
+    // flicker guard: skip the message while loading or when income exists.
+    if (isAnalyzing || income > 0) return null;
 
     return (
 
