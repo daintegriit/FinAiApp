@@ -26,6 +26,16 @@ const CATEGORY_COLORS = [
   "#F97316", "#84CC16",
 ];
 
+// Returns a distinct color for the category at `index`. Uses the curated
+// palette for the first 10, then generates evenly-spread HSL hues beyond
+// that — so any number of categories gets a unique color, never cycling.
+function categoryColor(index: number): string {
+  const i = index < 0 ? 0 : index;
+  if (i < CATEGORY_COLORS.length) return CATEGORY_COLORS[i];
+  const hue = ((i - CATEGORY_COLORS.length) * 47 + 200) % 360;
+  return `hsl(${hue}, 65%, 55%)`;
+}
+
 /* =====================================================
    HELPERS
 ===================================================== */
@@ -185,7 +195,7 @@ export default function CalendarScreen() {
           name,
           value: Math.round(value),
           itemStyle: {
-            color: CATEGORY_COLORS[(gi < 0 ? 0 : gi) % CATEGORY_COLORS.length],
+            color: categoryColor(gi),
           },
         };
       });
@@ -459,7 +469,7 @@ export default function CalendarScreen() {
                   <View
                     style={[
                       styles.legendDot,
-                      { backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] },
+                      { backgroundColor: categoryColor(i) },
                     ]}
                   />
                   <Text
@@ -522,10 +532,7 @@ export default function CalendarScreen() {
                         styles.txDot,
                         {
                           backgroundColor:
-                            CATEGORY_COLORS[
-                              allCategories.indexOf(tx.category) %
-                                CATEGORY_COLORS.length
-                            ],
+                            categoryColor(allCategories.indexOf(tx.category)),
                         },
                       ]}
                     />
