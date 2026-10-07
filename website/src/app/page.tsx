@@ -1,8 +1,11 @@
 "use client";
 
+import { useState, useEffect } from "react";
+
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Link from "next/link";
+import Image from "next/image";
 import {
   RiBrainLine,
   RiLineChartLine,
@@ -28,6 +31,56 @@ const stats = [
   { value: "Real", label: "Peer benchmarks" },
   { value: "0", label: "Generic advice" },
 ];
+
+const flow = [
+  "/screenshots/Login.PNG",
+  "/screenshots/IncomeScreen.PNG",
+  "/screenshots/FinancialProfileScreen.PNG",
+  "/screenshots/MainScreen.PNG",
+  "/screenshots/TopSignalreading.PNG",
+  "/screenshots/MainScreenwithCarCategoryTapped.PNG",
+  "/screenshots/Setabudget.PNG",
+  "/screenshots/createyourowncategory.PNG",
+  "/screenshots/AddTransaction.PNG",
+  "/screenshots/calendarOCT26.PNG",
+];
+
+function CyclingPhone() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI((p) => (p + 1) % flow.length), 2800);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.25rem" }}>
+      <div style={{ background: "#0F172A", borderRadius: 40, padding: "0.6rem", maxWidth: 300, width: "100%", boxShadow: "0 30px 60px rgba(17,24,39,0.22), 0 0 0 1px rgba(37,99,235,0.08)" }}>
+        <div style={{ borderRadius: 32, overflow: "hidden", background: "#000", aspectRatio: "9 / 19.5", position: "relative" }}>
+          {flow.map((srcUrl, idx) => (
+            <Image
+              key={srcUrl}
+              src={srcUrl}
+              alt="FinBudget AI screen"
+              fill
+              priority={idx === 0}
+              sizes="(max-width: 768px) 80vw, 300px"
+              style={{ objectFit: "cover", opacity: idx === i ? 1 : 0, transition: "opacity 0.6s ease" }}
+            />
+          ))}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: "0.4rem" }}>
+        {flow.map((_, idx) => (
+          <button
+            key={idx}
+            onClick={() => setI(idx)}
+            aria-label={"Screen " + (idx + 1)}
+            style={{ width: idx === i ? 20 : 8, height: 8, borderRadius: 100, border: "none", cursor: "pointer", padding: 0, background: idx === i ? "var(--accent)" : "var(--border)", transition: "width 0.3s, background 0.3s" }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
@@ -59,36 +112,9 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Phone mockup */}
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 32, padding: "1.5rem", maxWidth: 300, width: "100%", boxShadow: "0 30px 60px rgba(17,24,39,0.12), 0 0 0 1px rgba(37,99,235,0.06)" }}>
-            <div style={{ background: "#F9FAFB", border: "1px solid var(--border)", borderRadius: 20, padding: "1.25rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}>
-                <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--text)" }}>My Dashboard</span>
-                <span style={{ fontSize: "0.75rem", color: "var(--accent2)", fontWeight: 600 }}>● Live</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", background: "linear-gradient(135deg, #EFF6FF, #DBEAFE)", border: "2px solid #BFDBFE", borderRadius: "50%", width: 100, height: 100, margin: "0 auto 1.25rem" }}>
-                <span style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--accent)" }}>82</span>
-                <span style={{ fontSize: "0.6rem", color: "var(--muted)", letterSpacing: "0.1em" }}>SCORE</span>
-              </div>
-              {[
-                { label: "Monthly Income", value: "$6,500", green: true },
-                { label: "Savings Rate", value: "23%", green: true },
-                { label: "Debt Load", value: "Low", green: false },
-                { label: "Emergency Fund", value: "4.2 mo", green: true },
-                { label: "Peer Rank", value: "Top 18%", green: false },
-              ].map((m) => (
-                <div key={m.label} style={{ display: "flex", justifyContent: "space-between", padding: "0.55rem 0", borderBottom: "1px solid var(--border)", fontSize: "0.8rem" }}>
-                  <span style={{ color: "var(--muted)" }}>{m.label}</span>
-                  <span style={{ fontWeight: 600, color: m.green ? "var(--accent2)" : "var(--accent)" }}>{m.value}</span>
-                </div>
-              ))}
-              <div style={{ marginTop: "1rem", background: "var(--accent2-soft)", border: "1px solid #BBF7D0", borderRadius: 8, padding: "0.6rem 0.75rem", fontSize: "0.72rem", color: "#15803D", fontWeight: 500 }}>
-                ✦ Increasing savings by 5% gets you to Top 10%
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* CYCLING_PHONE */}
+        <CyclingPhone />
+
         <style>{`@media (max-width: 768px) { .hero-grid { grid-template-columns: 1fr !important; padding: 3rem 1.5rem 2rem !important; } }`}</style>
       </section>
 
