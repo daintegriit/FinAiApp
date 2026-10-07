@@ -1,138 +1,110 @@
 // =====================================================
-// 💎 FINAI — SPENDING TREND
+// 💎 FINAI — SPENDING TREND (elite)
 // =====================================================
+// Fixes the flat-line bug: instead of a hardcoded "last 14 days
+// from today" window (which misses data dated outside it), the
+// trend is built from the 14-day window ending on the user's most
+// recent transaction — so real spending always shows. Adds an area
+// fill, a period total, and a direction indicator.
 
-import React, {
-  useMemo,
-} from "react";
-
-import {
-  View,
-  Text,
-  StyleSheet,
-} from "react-native";
-
+import React, { useMemo } from "react";
+import { View, Text, StyleSheet } from "react-native";
 import {
   CartesianChart,
   Line,
+  Area,
   useChartPressState,
 } from "victory-native";
+import { Circle, useFont } from "@shopify/react-native-skia";
+import { useFinanceStore } from "../../../src/store/financeStore";
+import { useTheme } from "../../../src/theme/ThemeContext";
 
-import {
-  Circle,
-  useFont,
-} from "@shopify/react-native-skia";
-
-import {
-  useFinanceStore,
-} from "../../../src/store/financeStore";
-
-import {
-  useTheme,
-} from "../../../src/theme/ThemeContext";
-
-/* =====================================================
-   TYPES
-===================================================== */
-
-type TrendPoint = {
-  day: string;
-  amount: number;
-};
-
-/* =====================================================
-   HELPERS
-===================================================== */
+type TrendPoint = { day: string; amount: number };
 
 function safeNumber(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function fmtDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseDate(iso: string): Date {
+  const hasTz = /Z$|[+-]\d{2}:\d{2}$/.test(iso);
+  return new Date(hasTz ? iso : `${iso}Z`);
+}
+
+// Build a 14-day daily-spend series ending on the most recent
+// transaction date (not "today"), so data is always in-window.
 function buildDailyTrend(transactions: any[]): TrendPoint[] {
-  if (!Array.isArray(transactions) || transactions.length === 0) {
-    return [];
+  if (!Array.isArray(transactions) || transactions.length === 0) return [];
+
+  // Find the latest transaction date.
+  let latest = 0;
+  for (const tx of transactions) {
+    const raw = tx.created_at || tx.date;
+    if (!raw) continue;
+    const t = parseDate(String(raw)).getTime();
+    if (Number.isFinite(t) && t > latest) latest = t;
+  }
+  const anchor = latest > 0 ? new Date(latest) : new Date();
+
+  // Pre-sum spend per day key for speed.
+  const perDay: Record<string, number> = {};
+  for (const tx of transactions) {
+    const raw = tx.created_at || tx.date;
+    if (!raw) continue;
+    const key = fmtDateKey(parseDate(String(raw)));
+    perDay[key] = (perDay[key] || 0) + Math.abs(safeNumber(tx.amount));
   }
 
-  const now = new Date();
   const days: TrendPoint[] = [];
-
   for (let i = 13; i >= 0; i--) {
-    const date = new Date(now);
+    const date = new Date(anchor);
     date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split("T")[0];
+    const key = fmtDateKey(date);
     const label = date.toLocaleDateString("en-US", { weekday: "short" });
-
-    const dayTotal = transactions
-      .filter((tx) => {
-        const txDate = tx.created_at || tx.date;
-        if (!txDate) return false;
-        return String(txDate).startsWith(dateStr);
-      })
-      .reduce((sum, tx) => sum + safeNumber(tx.amount), 0);
-
-    days.push({ day: label, amount: dayTotal });
+    days.push({ day: label, amount: Math.round((perDay[key] || 0) * 100) / 100 });
   }
-
   return days;
 }
 
-/* =====================================================
-   COMPONENT
-===================================================== */
-
 export default function SpendingTrend() {
-
   const { theme } = useTheme();
+  const transactions = useFinanceStore((state) => state.transactions);
 
-  /* ===================================================
-     STORE — derived from real transactions
-  =================================================== */
+  const trendData = useMemo<TrendPoint[]>(
+    () => buildDailyTrend(transactions),
+    [transactions]
+  );
 
-  const transactions =
-    useFinanceStore(
-      (state) => state.transactions
-    );
+  const total = useMemo(
+    () => trendData.reduce((s, p) => s + p.amount, 0),
+    [trendData]
+  );
 
-  const trendData =
-    useMemo<TrendPoint[]>(() => {
-      return buildDailyTrend(transactions);
-    }, [transactions]);
+  // Direction: compare the back half vs the front half of the window.
+  const direction = useMemo(() => {
+    if (trendData.length < 4) return 0;
+    const half = Math.floor(trendData.length / 2);
+    const first = trendData.slice(0, half).reduce((s, p) => s + p.amount, 0);
+    const second = trendData.slice(half).reduce((s, p) => s + p.amount, 0);
+    if (second > first * 1.05) return 1;
+    if (second < first * 0.95) return -1;
+    return 0;
+  }, [trendData]);
 
-  /* ===================================================
-     CHART PRESS STATE
-  =================================================== */
-
-  const {
-    state,
-    isActive,
-  } = useChartPressState({
+  const { state, isActive } = useChartPressState({
     x: "",
-    y: {
-      amount: 0,
-    },
+    y: { amount: 0 },
   });
 
-  /* ===================================================
-     FONT
-  =================================================== */
-
-  const font =
-    useFont(
-      require("../../../assets/fonts/Unageo-Regular.ttf"),
-      10
-    );
-
-  /* ===================================================
-     ACTIVE VALUE
-  =================================================== */
-
-  const activeAmount =
-    safeNumber(state.y.amount.value);
-
-  /* ===================================================
-     EMPTY STATE
-  =================================================== */
+  const font = useFont(require("../../../assets/fonts/Unageo-Regular.ttf"), 10);
+  const activeAmount = safeNumber(state.y.amount.value);
 
   if (!trendData.length) {
     return (
@@ -148,21 +120,23 @@ export default function SpendingTrend() {
         <Text
           style={[
             styles.emptyText,
-            {
-              color: theme.colors.textSecondary,
-              fontFamily: theme.fonts.primary,
-            },
+            { color: theme.colors.textSecondary, fontFamily: theme.fonts.primary },
           ]}
         >
-          No spending trend data available
+          No spending trend data yet
         </Text>
       </View>
     );
   }
 
-  /* ===================================================
-     UI
-  =================================================== */
+  const dirColor =
+    direction > 0
+      ? theme.colors.danger
+      : direction < 0
+      ? theme.colors.success
+      : theme.colors.textSecondary;
+  const dirLabel =
+    direction > 0 ? "Trending up" : direction < 0 ? "Trending down" : "Steady";
 
   return (
     <View
@@ -183,15 +157,24 @@ export default function SpendingTrend() {
         >
           Spending Trend
         </Text>
-
-        <Text
-          style={[
-            styles.subtitle,
-            { color: theme.colors.textSecondary, fontFamily: theme.fonts.primary },
-          ]}
-        >
-          Daily financial activity visualization
-        </Text>
+        <View style={styles.headerRow}>
+          <Text
+            style={[
+              styles.subtitle,
+              { color: theme.colors.textSecondary, fontFamily: theme.fonts.primary },
+            ]}
+          >
+            Last 14 days · ${total.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </Text>
+          <Text
+            style={[
+              styles.direction,
+              { color: dirColor, fontFamily: theme.fonts.semibold },
+            ]}
+          >
+            {dirLabel}
+          </Text>
+        </View>
       </View>
 
       {isActive && (
@@ -202,9 +185,8 @@ export default function SpendingTrend() {
               { color: theme.colors.textSecondary, fontFamily: theme.fonts.primary },
             ]}
           >
-            Active Amount
+            Selected day
           </Text>
-
           <Text
             style={[
               styles.activeValue,
@@ -230,15 +212,21 @@ export default function SpendingTrend() {
             lineColor: theme.colors.divider,
           }}
         >
-          {({ points }) => (
+          {({ points, chartBounds }) => (
             <>
+              <Area
+                points={points.amount}
+                y0={chartBounds.bottom}
+                color={theme.colors.chart4}
+                opacity={0.14}
+                animate={{ type: "timing", duration: 700 }}
+              />
               <Line
                 points={points.amount}
                 color={theme.colors.chart4}
                 strokeWidth={3}
                 animate={{ type: "timing", duration: 700 }}
               />
-
               {isActive && (
                 <Circle
                   cx={safeNumber(state.x.position)}
@@ -255,10 +243,6 @@ export default function SpendingTrend() {
   );
 }
 
-/* =====================================================
-   STYLES
-===================================================== */
-
 const styles = StyleSheet.create({
   container: {
     marginTop: 20,
@@ -268,22 +252,20 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 14,
   },
-  header: {
-    paddingHorizontal: 18,
-    marginBottom: 14,
+  header: { paddingHorizontal: 18, marginBottom: 14 },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
   },
   title: { fontSize: 20 },
-  subtitle: { marginTop: 4, fontSize: 13 },
-  activeContainer: {
-    paddingHorizontal: 18,
-    marginBottom: 8,
-  },
+  subtitle: { fontSize: 13 },
+  direction: { fontSize: 12 },
+  activeContainer: { paddingHorizontal: 18, marginBottom: 8 },
   activeLabel: { fontSize: 12 },
   activeValue: { marginTop: 4, fontSize: 24 },
-  chartWrapper: {
-    height: 260,
-    paddingRight: 12,
-  },
+  chartWrapper: { height: 260, paddingRight: 12 },
   emptyContainer: {
     marginTop: 20,
     paddingVertical: 30,

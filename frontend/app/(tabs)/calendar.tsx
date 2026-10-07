@@ -114,6 +114,33 @@ export default function CalendarScreen() {
     return selectedDayTxs.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
   }, [selectedDayTxs]);
 
+  // Month summary: total spent, transaction count, top category.
+  const monthSummary = useMemo(() => {
+    let total = 0;
+    let count = 0;
+    const byCat: Record<string, number> = {};
+    Object.values(dailyData).forEach((cats) => {
+      Object.entries(cats).forEach(([cat, val]) => {
+        total += val;
+        byCat[cat] = (byCat[cat] || 0) + val;
+      });
+    });
+    Object.keys(dailyData).forEach((day) => {
+      // count transactions for days in this month
+    });
+    transactions.forEach((tx) => {
+      if (!tx.created_at) return;
+      const d = parseServerDate(tx.created_at);
+      if (d.getFullYear() === year && d.getMonth() === month) count += 1;
+    });
+    let topCat = "—";
+    let topVal = 0;
+    Object.entries(byCat).forEach(([cat, val]) => {
+      if (val > topVal) { topVal = val; topCat = cat; }
+    });
+    return { total, count, topCat };
+  }, [dailyData, transactions, year, month]);
+
   // ===================================================
   // NAVIGATION
   // ===================================================
@@ -349,6 +376,40 @@ export default function CalendarScreen() {
           </View>
         </View>
 
+        {/* MONTH SUMMARY */}
+        {monthSummary.count > 0 && (
+          <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
+            <View style={[styles.monthSummaryCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryValue, { color: theme.colors.text, fontFamily: theme.fonts.display }]}>
+                  ${monthSummary.total.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </Text>
+                <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary, fontFamily: theme.fonts.primary }]}>
+                  Spent
+                </Text>
+              </View>
+              <View style={[styles.summaryDivider, { backgroundColor: theme.colors.divider }]} />
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryValue, { color: theme.colors.text, fontFamily: theme.fonts.display }]}>
+                  {monthSummary.count}
+                </Text>
+                <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary, fontFamily: theme.fonts.primary }]}>
+                  Transactions
+                </Text>
+              </View>
+              <View style={[styles.summaryDivider, { backgroundColor: theme.colors.divider }]} />
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryValue, { color: theme.colors.text, fontFamily: theme.fonts.semibold, fontSize: 15 }]} numberOfLines={1}>
+                  {monthSummary.topCat}
+                </Text>
+                <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary, fontFamily: theme.fonts.primary }]}>
+                  Top category
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* ============================================= */}
         {/* ECHARTS CALENDAR */}
         {/* ============================================= */}
@@ -532,6 +593,18 @@ export default function CalendarScreen() {
 ===================================================== */
 
 const styles = StyleSheet.create({
+  monthSummaryCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  summaryItem: { flex: 1, alignItems: "center" },
+  summaryValue: { fontSize: 18, letterSpacing: -0.5 },
+  summaryLabel: { fontSize: 11, marginTop: 4 },
+  summaryDivider: { width: 1, height: 32 },
   title: {
     fontSize: 32,
     letterSpacing: -0.5,
