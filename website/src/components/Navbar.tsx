@@ -10,7 +10,8 @@ export default function Navbar() {
   return (
     <nav style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(245,247,250,0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--border)" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "1.1rem 2rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Link href="/" style={{ textDecoration: "none" }}>
+        <Link href="/" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "0.6rem" }}>
+          <img src="/logo-dark.png" alt="FinBudget AI" width={34} height={34} style={{ borderRadius: 8, display: "block" }} />
           <span style={{ fontSize: "1.3rem", fontWeight: 800, letterSpacing: "-0.02em", color: "var(--text)" }}>
             FinBudget <span style={{ color: "var(--accent)" }}>AI</span>
           </span>

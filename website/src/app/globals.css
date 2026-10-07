@@ -15,8 +15,8 @@
 
   /* Brand */
   --primary: #111827;
-  --accent: #2563EB;
-  --accent-soft: #DBEAFE;
+  --accent: #1E293B; /* NAVY_PALETTE */
+  --accent-soft: #E2E8F0;
   --accent2: #16A34A;
   --accent2-soft: #DCFCE7;
 
@@ -50,7 +50,7 @@ body {
 }
 
 ::selection {
-  background: rgba(37, 99, 235, 0.15);
+  background: rgba(30, 41, 59, 0.15);
 }
 
 ::-webkit-scrollbar {
