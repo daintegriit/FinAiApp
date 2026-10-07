@@ -179,11 +179,16 @@ export default function CalendarScreen() {
 
   const pieSeries = useMemo(() => {
     return Object.entries(dailyData).map(([day, cats], index) => {
-      const pieData = Object.entries(cats).map(([name, value], i) => ({
-        name,
-        value: Math.round(value),
-        itemStyle: { color: CATEGORY_COLORS[i % CATEGORY_COLORS.length] },
-      }));
+      const pieData = Object.entries(cats).map(([name, value]) => {
+        const gi = allCategories.indexOf(name);
+        return {
+          name,
+          value: Math.round(value),
+          itemStyle: {
+            color: CATEGORY_COLORS[(gi < 0 ? 0 : gi) % CATEGORY_COLORS.length],
+          },
+        };
+      });
 
       return {
         type: "pie",
@@ -195,7 +200,7 @@ export default function CalendarScreen() {
         data: pieData,
       };
     });
-  }, [dailyData]);
+  }, [dailyData, allCategories]);
 
   const scatterData = useMemo(() => {
     const days: string[] = [];
