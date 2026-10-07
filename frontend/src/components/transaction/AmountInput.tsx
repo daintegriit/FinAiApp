@@ -9,6 +9,12 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../../src/theme/ThemeContext";
 
+// Cents-first money entry. Each digit fills from the cents up:
+//   "4"   -> $0.04
+//   "49"  -> $0.49
+//   "499" -> $4.99
+// The parent `value` is kept as a normal dollar string (e.g. "4.99")
+// so existing validation/submit (parseFloat(amount)) works unchanged.
 export default function AmountInput({
   value,
   setValue,
@@ -16,91 +22,122 @@ export default function AmountInput({
   const { theme } = useTheme();
   const { width } = useWindowDimensions();
 
-  // 3 Columns stretched elegantly to the screen edges with padding
-  const keyWidth = (width - 48) / 3; 
-  const keyHeight = 46; // Compact, clean hit target
+  const keyWidth = (width - 48) / 3;
+  const keyHeight = 46;
 
-  function handlePress(num: string) {
-    setValue((prev: string) => {
-      if (num === "." && prev.includes(".")) return prev;
-      if (prev === "0" && num !== ".") return num;
-      return prev + num;
-    });
+  const MAX_CENTS = 9999999; // up to $99,999.99
+
+  // Derive the current cents integer from the dollar-string value.
+  function currentCents(): number {
+    const n = parseFloat(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.round(n * 100);
+  }
+
+  // Write cents back to the parent as a clean dollar string.
+  function commitCents(cents: number) {
+    const clamped = Math.min(Math.max(cents, 0), MAX_CENTS);
+    setValue((clamped / 100).toFixed(2));
+  }
+
+  function handleDigit(d: string) {
+    const digit = Number(d);
+    if (!Number.isFinite(digit)) return;
+    const next = currentCents() * 10 + digit;
+    commitCents(next);
   }
 
   function handleDelete() {
-    setValue((prev: string) => prev.slice(0, -1));
+    const next = Math.floor(currentCents() / 10);
+    commitCents(next);
   }
 
   function handleClear() {
     setValue("");
   }
 
-  function formatAmount(val: string) {
-    if (!val) return "0.00";
-    const num = parseFloat(val);
-    if (isNaN(num)) return "0.00";
-    return num.toFixed(2);
+  // Display: always two decimals, from the cents integer.
+  function displayAmount(): string {
+    const cents = currentCents();
+    return (cents / 100).toFixed(2);
   }
 
   const numpadRows = [
     ["1", "2", "3"],
     ["4", "5", "6"],
-    ["7", "8", "9"]
+    ["7", "8", "9"],
   ];
 
   return (
     <View style={styles.container}>
-      {/* ====================================== */}
-      {/* 💰 PREMIUM HERO AMOUNT READOUT */}
-      {/* ====================================== */}
-      <Text style={[styles.amount, { color: theme.colors.text, fontFamily: theme.fonts.accent2 }]}>
-        ${formatAmount(value)}
+      {/* HERO AMOUNT */}
+      <Text
+        style={[
+          styles.amount,
+          { color: theme.colors.text, fontFamily: theme.fonts.accent2 },
+        ]}
+      >
+        ${displayAmount()}
       </Text>
 
-      {/* ====================================== */}
-      {/* 🕹️ CLEAN, BORDERLESS 3-COLUMN KEYPAD */}
-      {/* ====================================== */}
+      {/* KEYPAD */}
       <View style={styles.keyboardContainer}>
-        {/* Core numbers 1 through 9 */}
         {numpadRows.map((row, rowIndex) => (
           <View key={rowIndex} style={styles.row}>
             {row.map((n) => (
-              <TouchableOpacity 
-                key={n} 
-                style={[styles.key, { width: keyWidth, height: keyHeight }]} 
-                onPress={() => handlePress(n)}
+              <TouchableOpacity
+                key={n}
+                style={[styles.key, { width: keyWidth, height: keyHeight }]}
+                onPress={() => handleDigit(n)}
                 activeOpacity={0.6}
               >
-                <Text style={[styles.keyText, { color: theme.colors.text, fontFamily: theme.fonts.accent2 }]}>{n}</Text>
+                <Text
+                  style={[
+                    styles.keyText,
+                    { color: theme.colors.text, fontFamily: theme.fonts.accent2 },
+                  ]}
+                >
+                  {n}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
         ))}
 
-        {/* Dynamic bottom row: Clear (C), Zero (0), Backspace (⌫) */}
+        {/* Bottom row: Clear, 0, Backspace */}
         <View style={styles.row}>
-          {/* C Key */}
-          <TouchableOpacity 
-            style={[styles.key, { width: keyWidth, height: keyHeight }]} 
+          <TouchableOpacity
+            style={[styles.key, { width: keyWidth, height: keyHeight }]}
             onPress={handleClear}
             activeOpacity={0.6}
           >
-            <Text style={[styles.actionText, { color: theme.colors.textSecondary || "#666" }]}>C</Text>
-          </TouchableOpacity>
-          
-          {/* 0 Key */}
-          <TouchableOpacity 
-            style={[styles.key, { width: keyWidth, height: keyHeight }]} 
-            onPress={() => handlePress("0")}
-            activeOpacity={0.6}
-          >
-            <Text style={[styles.keyText, { color: theme.colors.text, fontFamily: theme.fonts.accent2 }]}>0</Text>
+            <Text
+              style={[
+                styles.actionText,
+                { color: theme.colors.textSecondary || "#666" },
+              ]}
+            >
+              C
+            </Text>
           </TouchableOpacity>
 
-          {/* Backspace Key integrated directly into the layout */}
-          <TouchableOpacity 
-            style={[styles.key, { width: keyWidth, height: keyHeight }]} 
+          <TouchableOpacity
+            style={[styles.key, { width: keyWidth, height: keyHeight }]}
+            onPress={() => handleDigit("0")}
+            activeOpacity={0.6}
+          >
+            <Text
+              style={[
+                styles.keyText,
+                { color: theme.colors.text, fontFamily: theme.fonts.accent2 },
+              ]}
+            >
+              0
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.key, { width: keyWidth, height: keyHeight }]}
             onPress={handleDelete}
             activeOpacity={0.6}
           >
@@ -112,17 +149,14 @@ export default function AmountInput({
   );
 }
 
-/* =====================================================
-   🎨 MINIMALIST FINTECH DESIGN STYLES
-===================================================== */
 const styles = StyleSheet.create({
   container: {
     width: "100%",
     alignItems: "center",
-    paddingHorizontal: 24, // Symmetrical, premium breathing room
+    paddingHorizontal: 24,
   },
   amount: {
-    fontSize: 48, // Large, confident hero font size
+    fontSize: 48,
     fontWeight: "700",
     marginBottom: 24,
     textAlign: "center",
@@ -130,7 +164,7 @@ const styles = StyleSheet.create({
   },
   keyboardContainer: {
     width: "100%",
-    gap: 4, // Tight gaps drop total component height
+    gap: 4,
   },
   row: {
     flexDirection: "row",
@@ -140,15 +174,14 @@ const styles = StyleSheet.create({
   key: {
     justifyContent: "center",
     alignItems: "center",
-    // Note: No background color, no borders, no cards. Clean glass look.
-    backgroundColor: "transparent", 
+    backgroundColor: "transparent",
   },
   keyText: {
-    fontSize: 26, // Elegant typography scale
+    fontSize: 26,
     fontWeight: "500",
   },
   actionText: {
     fontSize: 20,
     fontWeight: "400",
-  }
+  },
 });
