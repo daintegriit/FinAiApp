@@ -6,6 +6,7 @@
 // =====================================================
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useRouter } from "expo-router";
 import {
   View,
   Text,
@@ -183,6 +184,7 @@ export default function FinancialMirror({
   recurringTermMonths = null,
 }: MirrorProps) {
   const { theme } = useTheme();
+  const router = useRouter();
   const c = theme.colors;
   const f = theme.fonts;
 
@@ -245,12 +247,7 @@ export default function FinancialMirror({
   const [outOfQuota, setOutOfQuota] = useState(false);
 
   const onUpgradePress = () => {
-    // Placeholder until RevenueCat paywall is wired. Keeps the button
-    // functional (and honest) rather than dead.
-    Alert.alert(
-      "Premium coming soon",
-      "Unlimited AI insights will be available with FinBudget Premium. The numbers and budget context stay free."
-    );
+    router.push("/paywall");
   };
 
 

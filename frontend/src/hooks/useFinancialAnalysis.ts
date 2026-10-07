@@ -99,7 +99,11 @@ export function useFinancialAnalysis() {
         throw new Error("Income is required before analysis");
       }
 
-      if (!profile) {
+      // Read the live store value (synchronous in Zustand), not the
+      // closed-over selector — avoids a stale-closure "profile missing"
+      // throw when runAnalysis() is called right after setProfile().
+      const effectiveProfile = useFinanceStore.getState().profile || profile;
+      if (!effectiveProfile) {
         throw new Error("Financial profile missing");
       }
 
@@ -143,29 +147,29 @@ export function useFinancialAnalysis() {
 
 
           // Demographics
-          age: safeNumber(profile.age, 25),
+          age: safeNumber(effectiveProfile.age, 25),
 
-          employment_type: (profile.employment_type || "salary") as any,
-          risk_tolerance: (profile.risk_tolerance || "moderate") as any,
-          investment_experience: (profile.investment_experience || "beginner") as any,
-          lifestyle_priority: (profile.lifestyle_priority || "balanced") as any,
-          income_stability: (profile.income_stability || "stable") as any,
+          employment_type: (effectiveProfile.employment_type || "salary") as any,
+          risk_tolerance: (effectiveProfile.risk_tolerance || "moderate") as any,
+          investment_experience: (effectiveProfile.investment_experience || "beginner") as any,
+          lifestyle_priority: (effectiveProfile.lifestyle_priority || "balanced") as any,
+          income_stability: (effectiveProfile.income_stability || "stable") as any,
           purchase_category: safeCategory as any,
           currency: "USD" as const,
           region: "US" as const,
 
           // Financial snapshot
-          savings_buffer: safeNumber(profile.savings_buffer),
-          existing_debt: safeNumber(profile.existing_debt),
-          emergency_fund_months: safeNumber(profile.emergency_fund_months),
+          savings_buffer: safeNumber(effectiveProfile.savings_buffer),
+          existing_debt: safeNumber(effectiveProfile.existing_debt),
+          emergency_fund_months: safeNumber(effectiveProfile.emergency_fund_months),
           
 
 
-          financial_goal: profile.financial_goal || undefined,
+          financial_goal: effectiveProfile.financial_goal || undefined,
 
           // Lifestyle utility
-          family_value: safeNumber(profile.family_value),
-          personal_satisfaction: safeNumber(profile.personal_satisfaction),
+          family_value: safeNumber(effectiveProfile.family_value),
+          personal_satisfaction: safeNumber(effectiveProfile.personal_satisfaction),
 
           // Goal modeling
           decision_horizon_years: 30,

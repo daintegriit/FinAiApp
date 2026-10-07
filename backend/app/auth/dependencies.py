@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # prompt against the same model, so metering them separately would let
 # a user exhaust one and keep spending on the other.
 
-FREE_MONTHLY_SIMULATIONS = 10
+FREE_MONTHLY_SIMULATIONS = 5
 
 METERED_FEATURE = "simulation"
 

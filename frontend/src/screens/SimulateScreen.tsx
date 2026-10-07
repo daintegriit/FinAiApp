@@ -30,6 +30,7 @@ import {
 
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { useRouter } from "expo-router";
 
 import { useTheme } from "../../src/theme/ThemeContext";
 import { useFinancialAnalysis } from "../../src/hooks/useFinancialAnalysis";
@@ -70,6 +71,7 @@ const CATEGORY_OPTIONS: PurchaseCategory[] = [
 export default function SimulateScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const { runAnalysis } = useFinancialAnalysis();
   const { user } = useAuth();
@@ -143,6 +145,7 @@ export default function SimulateScreen() {
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [term, setTerm] = useState("36");
+  const [termUnit, setTermUnit] = useState<"days" | "weeks" | "months" | "years">("months");
   const [category, setCategory] = useState<PurchaseCategory>("other");
 
   const [loading, setLoading] = useState(false);
@@ -154,9 +157,14 @@ export default function SimulateScreen() {
   }, [amount]);
 
   const parsedTerm = useMemo(() => {
-    const value = Number(term);
-    return Number.isFinite(value) ? value : 0;
-  }, [term]);
+    const n = Number(term);
+    const months =
+      termUnit === "days" ? n / 30 :
+      termUnit === "weeks" ? n / 4.33 :
+      termUnit === "years" ? n * 12 :
+      n;
+    return Number.isFinite(months) ? months : 0;
+  }, [term, termUnit]);
 
   const isValid = parsedAmount > 0 && parsedTerm > 0;
 
@@ -174,58 +182,9 @@ export default function SimulateScreen() {
 
   const [purchasing, setPurchasing] = useState(false);
 
-  const handleUpgrade = useCallback(async () => {
-    if (purchasing) return;
-    setPurchasing(true);
-
-    try {
-      const packages = await getAvailablePackages();
-
-      if (packages.length === 0) {
-        // No product configured yet (or store not reachable). Until the
-        // App Store subscription is live this is the expected path.
-        Alert.alert(
-          "Not available yet",
-          "Upgrades aren't available right now. Please try again later."
-        );
-        return;
-      }
-
-      // Single subscription offering — take the first package. If you
-      // add multiple tiers later, present a picker here instead.
-      const result = await purchasePackage(packages[0]);
-
-      if (result.cancelled) {
-        return; // user backed out; say nothing
-      }
-
-      if (result.success && result.unlimited) {
-        // SDK confirms entitlement immediately. Lift the paywall now;
-        // the backend webhook will also set subscription_status so the
-        // server agrees on the next quota fetch.
-        setQuota({
-          limit: quota?.limit ?? null,
-          used: quota?.used ?? 0,
-          remaining: null,
-          unlimited: true,
-        });
-        Alert.alert(
-          "You're all set",
-          "You now have unlimited simulations. Thanks for upgrading!"
-        );
-      } else {
-        Alert.alert(
-          "Purchase incomplete",
-          result.error || "Something went wrong. You have not been charged."
-        );
-      }
-    } catch (err: any) {
-      if (__DEV__) console.error("Upgrade failed:", err);
-      Alert.alert("Upgrade failed", "Please try again in a moment.");
-    } finally {
-      setPurchasing(false);
-    }
-  }, [purchasing, quota, setQuota]);
+  const handleUpgrade = useCallback(() => {
+    router.push("/paywall");
+  }, [router]);
 
   const handleRestore = useCallback(async () => {
     if (purchasing) return;
@@ -342,6 +301,7 @@ export default function SimulateScreen() {
       setName("");
       setAmount("");
       setTerm("36");
+    setTermUnit("months");
       setCategory("other");
     } catch (err: any) {
       if (__DEV__) console.error("SIMULATION FAILURE:", err);
@@ -456,7 +416,59 @@ export default function SimulateScreen() {
           >
             <Input label="Simulation Name" value={name} setValue={setName} theme={theme} />
             <Input label="Monthly Payment ($)" value={amount} setValue={setAmount} theme={theme} />
-            <Input label="Term (months)" value={term} setValue={setTerm} theme={theme} />
+            <Input label="Term" value={term} setValue={setTerm} theme={theme} />
+
+            {/* TERM UNIT SELECTOR */}
+            <View style={[styles.row, { marginTop: 4, marginBottom: 4 }]}>
+              {(["days", "weeks", "months", "years"] as const).map((u) => {
+                const sel = termUnit === u;
+                return (
+                  <TouchableOpacity
+                    key={u}
+                    activeOpacity={0.85}
+                    onPress={() => setTermUnit(u)}
+                    style={[
+                      styles.option,
+                      {
+                        borderColor: sel ? theme.colors.primary : theme.colors.divider,
+                        backgroundColor: sel ? `${theme.colors.primary}18` : theme.colors.background,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: sel ? theme.colors.primary : theme.colors.textSecondary,
+                        fontFamily: theme.fonts.primary,
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {u}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* PAYMENT BREAKDOWN */}
+            {parsedAmount > 0 && (
+              <View style={[styles.breakdownCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.divider }]}>
+                {[
+                  { k: "Daily", v: parsedAmount / 30 },
+                  { k: "Weekly", v: parsedAmount / 4.33 },
+                  { k: "Monthly", v: parsedAmount },
+                  { k: "Yearly", v: parsedAmount * 12 },
+                ].map((row) => (
+                  <View key={row.k} style={styles.breakdownRow}>
+                    <Text style={[styles.breakdownLabel, { color: theme.colors.textSecondary, fontFamily: theme.fonts.primary }]}>
+                      {row.k}
+                    </Text>
+                    <Text style={[styles.breakdownValue, { color: theme.colors.text, fontFamily: theme.fonts.semibold }]}>
+                      ${row.v.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
             <Text
               style={[
@@ -980,6 +992,10 @@ function Input({
 ===================================================== */
 
 const styles = StyleSheet.create({
+  breakdownCard: { borderWidth: 1, borderRadius: 16, padding: 14, marginTop: 8, gap: 8 },
+  breakdownRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  breakdownLabel: { fontSize: 13 },
+  breakdownValue: { fontSize: 14 },
   safe: { flex: 1 },
   flex: { flex: 1 },
   formCard: { borderRadius: 28, borderWidth: 1, padding: 20 },

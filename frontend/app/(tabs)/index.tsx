@@ -14,6 +14,7 @@ import { useAuth } from "../../src/context/AuthContext";
 import { api } from "../../src/services/api";
 import { getTransactions } from "../../src/services/transactions";
 import { fetchCategories } from "../../src/services/categories";
+import { useFinancialAnalysis } from "../../src/hooks/useFinancialAnalysis";
 import DashboardHeader from "../../src/components/header/DashboardHeader";
 import CategoryDonut from "../../src/components/dashboard/CategoryDonut";
 import CategoryBreakdown from "../../src/components/dashboard/CategoryBreakdown";
@@ -28,6 +29,9 @@ export default function Dashboard() {
   const setIncome = useFinanceStore((s) => s.setIncome);
   const setProfile = useFinanceStore((s) => s.setProfile);
   const setUserCategoryGrid = useFinanceStore((s) => s.setUserCategoryGrid);
+  const analysis = useFinanceStore((s) => s.analysis);
+  const { runAnalysis } = useFinancialAnalysis();
+  const hasRunAnalysis = React.useRef(false);
 
   const [profileChecked, setProfileChecked] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -76,6 +80,11 @@ export default function Dashboard() {
           }
         } catch (catErr) {
           console.error("Failed to hydrate categories:", catErr);
+        }
+
+        if (!analysis && !hasRunAnalysis.current && p && p.monthly_income > 0) {
+          hasRunAnalysis.current = true;
+          runAnalysis({ income: Number(p.monthly_income) }).catch(() => {});
         }
 
         setProfileChecked(true);
