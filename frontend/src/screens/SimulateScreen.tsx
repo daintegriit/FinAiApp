@@ -144,6 +144,7 @@ export default function SimulateScreen() {
 
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
+  const [amountUnit, setAmountUnit] = useState<"day" | "week" | "month" | "year">("month");
   const [term, setTerm] = useState("36");
   const [termUnit, setTermUnit] = useState<"days" | "weeks" | "months" | "years">("months");
   const [category, setCategory] = useState<PurchaseCategory>("other");
@@ -152,9 +153,14 @@ export default function SimulateScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const parsedAmount = useMemo(() => {
-    const value = Number(amount);
-    return Number.isFinite(value) ? value : 0;
-  }, [amount]);
+    const n = Number(amount);
+    const monthly =
+      amountUnit === "day" ? n * 30 :
+      amountUnit === "week" ? n * 4.33 :
+      amountUnit === "year" ? n / 12 :
+      n;
+    return Number.isFinite(monthly) ? monthly : 0;
+  }, [amount, amountUnit]);
 
   const parsedTerm = useMemo(() => {
     const n = Number(term);
@@ -445,7 +451,48 @@ export default function SimulateScreen() {
             ]}
           >
             <Input label="Simulation Name" value={name} setValue={setName} theme={theme} />
-            <Input label="Monthly Payment ($)" value={amount} setValue={setAmount} theme={theme} />
+            <Input
+              label={
+                amountUnit === "day" ? "Daily Amount ($)" :
+                amountUnit === "week" ? "Weekly Amount ($)" :
+                amountUnit === "year" ? "Yearly Amount ($)" :
+                "Monthly Amount ($)"
+              }
+              value={amount}
+              setValue={setAmount}
+              theme={theme}
+            />
+
+            {/* AMOUNT CADENCE SELECTOR */}
+            <View style={[styles.row, { marginTop: 4, marginBottom: 4 }]}>
+              {(["day", "week", "month", "year"] as const).map((u) => {
+                const sel = amountUnit === u;
+                return (
+                  <TouchableOpacity
+                    key={u}
+                    activeOpacity={0.85}
+                    onPress={() => setAmountUnit(u)}
+                    style={[
+                      styles.option,
+                      {
+                        borderColor: sel ? theme.colors.primary : theme.colors.divider,
+                        backgroundColor: sel ? `${theme.colors.primary}18` : theme.colors.background,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: sel ? theme.colors.primary : theme.colors.textSecondary,
+                        fontFamily: theme.fonts.primary,
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {"per " + u}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
             <Input label="Term" value={term} setValue={setTerm} theme={theme} />
 
             {/* TERM UNIT SELECTOR */}
@@ -958,7 +1005,7 @@ function Input({
   setValue: (value: string) => void;
   theme: any;
 }) {
-  const isMoney = label === "Monthly Payment ($)";
+  const isMoney = label.includes("Amount ($)") || label === "Monthly Payment ($)";
   const isName = label === "Simulation Name";
 
   return (
