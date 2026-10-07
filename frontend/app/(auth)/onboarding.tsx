@@ -149,6 +149,22 @@ export default function OnboardingScreen() {
     setLoading(true);
     setError(null);
 
+    // Geocode a manually-entered zip/city when GPS gave no coordinates,
+    // so the user still appears on the proximity globe. Zip is the source
+    // of truth for placement; city is just a display label.
+    let finalLat = latitude;
+    let finalLng = longitude;
+    if ((finalLat == null || finalLng == null) && (zipCode || city)) {
+      try {
+        const q = zipCode && zipCode.length >= 5 ? `${zipCode}, USA` : `${city}, ${state}, USA`;
+        const geo = await Location.geocodeAsync(q);
+        if (geo && geo.length > 0) {
+          finalLat = geo[0].latitude;
+          finalLng = geo[0].longitude;
+        }
+      } catch (e) {}
+    }
+
     try {
       await api.post("/profile/create", {
         monthly_income: parseFloat(income),
@@ -160,8 +176,8 @@ export default function OnboardingScreen() {
         city: city || null,
         state: state || null,
         zip_code: zipCode || null,
-        latitude: latitude || null,
-        longitude: longitude || null,
+        latitude: finalLat || null,
+        longitude: finalLng || null,
       });
 
       // Save to frontend store

@@ -221,7 +221,7 @@ export default function RegisterScreen() {
   const step1Valid =
     email.includes("@") &&
     username.length >= 3 &&
-    password.length >= 6;
+    password.length >= 8;
 
   const step2Valid =
     income.length > 0 &&
