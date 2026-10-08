@@ -39,9 +39,13 @@ const flow = [
   "/screenshots/MainScreen.PNG",
   "/screenshots/TopSignalreading.PNG",
   "/screenshots/MainScreenwithCarCategoryTapped.PNG",
+  "/screenshots/Analytics1.PNG",
+  "/screenshots/Simulation1.PNG",
+  "/screenshots/PeerGlobe.PNG",
   "/screenshots/Setabudget.PNG",
   "/screenshots/createyourowncategory.PNG",
   "/screenshots/AddTransaction.PNG",
+  "/screenshots/FinancialMirror1.PNG",
   "/screenshots/calendarOCT26.PNG",
 ];
 
